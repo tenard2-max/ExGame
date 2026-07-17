@@ -45,6 +45,14 @@ py -m http.server 7456 --directory .\build\web-desktop
 
 브라우저에서 `http://127.0.0.1:7456`을 엽니다.
 
+## 현재 조작
+
+- 키보드: `WASD` 또는 방향키
+- 마우스: 왼쪽 버튼을 누른 채 이동할 방향으로 드래그
+- 터치: 화면을 누른 채 이동할 방향으로 드래그
+
+마우스와 터치는 같은 포인터 이동 입력을 사용하며 hover에 의존하지 않습니다.
+
 ## 소스 구조
 
 ```text
@@ -52,6 +60,7 @@ assets/
 ├─ scenes/       # Cocos 씬
 └─ scripts/
    ├─ core/      # 부팅, 공통 수명주기
+   ├─ input/     # 키보드·마우스·터치 통합 입력
    ├─ world/     # Seed·Biome·Terrain·Chunk (3단계 이후)
    ├─ content/   # Ore·Dungeon·NPC·Treasure·Monster
    ├─ player/    # 플레이어 및 입력
@@ -63,4 +72,4 @@ assets/
 
 핵심 계약과 불변식은 [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)를 참고하세요.
 
-현재는 **3단계 핵심 아키텍처·데이터 모델까지 완료**한 상태입니다. 실제 월드 생성 및 게임 로직은 의도적으로 포함하지 않았습니다.
+현재는 **4단계 입력·캐릭터·카메라까지 완료**한 상태입니다. 절차적 월드 생성은 아직 포함하지 않았습니다.

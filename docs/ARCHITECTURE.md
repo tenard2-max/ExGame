@@ -80,5 +80,5 @@ finalChunk = generate(seed, x, y) + chunkDelta(x, y)
 - 타입·인터페이스와 스키마: 3단계 완료
 - 입력·캐릭터·카메라: 4단계 완료
 - 결정적 PRNG·지형·광석·3×3 청크 스트리밍: 5단계 완료
-- 채굴·설치와 변경분 생성: 6단계
-- IndexedDB 영속 저장: 9단계
+- 채굴·설치와 변경분(delta) localStorage 저장: 6단계 완료
+- IndexedDB 세이브 슬롯·플레이어 상태 영속화: 9단계

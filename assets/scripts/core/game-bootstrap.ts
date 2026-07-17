@@ -3,6 +3,7 @@ import {
   Color,
   Component,
   Graphics,
+  Label,
   Layers,
   Node,
   ResolutionPolicy,
@@ -13,16 +14,15 @@ import {
 import { UnifiedInput } from '../input/unified-input';
 import { DefaultContentGenerationPipeline } from '../content/default-content-pipeline';
 import { CameraFollow } from '../player/camera-follow';
+import { BlockInteractionController } from '../player/block-interaction-controller';
 import { PlayerController } from '../player/player-controller';
+import { LocalStorageChunkDeltaStore } from '../save/local-storage-delta-store';
 import { ChunkRenderer } from '../world/chunk-renderer';
 import { ChunkStreamingController } from '../world/chunk-streaming-controller';
 import { DefaultWorldGenerator } from '../world/default-world-generator';
 import { DefaultWorldGenerationPipeline } from '../world/default-world-pipeline';
 import { DefaultSeedDeriver } from '../world/deterministic-random';
-import {
-  EmptyChunkDeltaStore,
-  RuntimeChunkManager,
-} from '../world/runtime-chunk-manager';
+import { RuntimeChunkManager } from '../world/runtime-chunk-manager';
 
 const { ccclass } = _decorator;
 
@@ -53,7 +53,7 @@ export class GameBootstrap extends Component {
       DEFAULT_WORLD_SEED,
       generator,
       new ChunkRenderer(),
-      new EmptyChunkDeltaStore(),
+      new LocalStorageChunkDeltaStore(DEFAULT_WORLD_SEED),
     );
     const playerController = playerNode.addComponent(PlayerController);
     playerController.configure(
@@ -63,6 +63,28 @@ export class GameBootstrap extends Component {
     worldNode
       .addComponent(ChunkStreamingController)
       .configure(playerNode, chunkManager);
+
+    const cameraNode = this.node.getChildByName('Camera');
+    if (cameraNode) {
+      const inventoryLabel = this.createInventoryHud(cameraNode);
+      const interaction = this.node.addComponent(BlockInteractionController);
+      interaction.configure(
+        inputController,
+        playerNode,
+        cameraNode,
+        chunkManager,
+        (inventory) => {
+          inventoryLabel.string = formatInventory(inventory);
+          const debugGlobal = globalThis as typeof globalThis & {
+            __EXGAME_DEBUG__?: Record<string, unknown>;
+          };
+          debugGlobal.__EXGAME_DEBUG__ = {
+            ...debugGlobal.__EXGAME_DEBUG__,
+            inventory: Object.fromEntries(inventory),
+          };
+        },
+      );
+    }
 
     const firstSample = generator.generateChunk(
       DEFAULT_WORLD_SEED,
@@ -76,13 +98,32 @@ export class GameBootstrap extends Component {
       __EXGAME_DEBUG__?: Record<string, unknown>;
     };
     debugGlobal.__EXGAME_DEBUG__ = {
+      ...debugGlobal.__EXGAME_DEBUG__,
       deterministicMatch: JSON.stringify(firstSample)
         === JSON.stringify(secondSample),
       worldSeed: DEFAULT_WORLD_SEED,
+      chunkManager,
     };
 
-    const cameraNode = this.node.getChildByName('Camera');
     cameraNode?.addComponent(CameraFollow).configure(playerNode);
+  }
+
+  /** 카메라를 따라다니는 화면 고정 인벤토리 표시입니다. */
+  private createInventoryHud(cameraNode: Node): Label {
+    const hudNode = new Node('InventoryHud');
+    hudNode.layer = Layers.Enum.UI_2D;
+    cameraNode.addChild(hudNode);
+    hudNode.setPosition(-DESIGN_WIDTH / 2 + 20, DESIGN_HEIGHT / 2 - 20);
+
+    const transform = hudNode.addComponent(UITransform);
+    transform.setAnchorPoint(0, 1);
+
+    const label = hudNode.addComponent(Label);
+    label.fontSize = 24;
+    label.lineHeight = 30;
+    label.color = new Color(235, 245, 255, 255);
+    label.string = formatInventory(new Map());
+    return label;
   }
 
   private createWorld(): Node {
@@ -117,4 +158,16 @@ export class GameBootstrap extends Component {
     graphics.stroke();
     return playerNode;
   }
+}
+
+const ITEM_DISPLAY_NAMES: Readonly<Record<string, string>> = {
+  rock: '돌',
+  wood: '나무',
+};
+
+function formatInventory(inventory: ReadonlyMap<string, number>): string {
+  const parts = Object.entries(ITEM_DISPLAY_NAMES).map(
+    ([itemId, name]) => `${name} ${inventory.get(itemId) ?? 0}`,
+  );
+  return parts.join('   ');
 }

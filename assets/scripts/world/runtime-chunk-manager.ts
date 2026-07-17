@@ -1,7 +1,12 @@
 import { Node, Rect } from 'cc';
 
-import { CHUNK_MEMORY_RADIUS, MAX_LOADED_CHUNKS } from '../core/schema';
-import type { ChunkDelta } from '../save/save-types';
+import {
+  CHUNK_MEMORY_RADIUS,
+  CHUNK_SIZE_TILES,
+  MAX_LOADED_CHUNKS,
+} from '../core/schema';
+import type { BlockDelta, ChunkDelta } from '../save/save-types';
+import { getGroundBlockId, isSolidBlock } from './block-registry';
 import type {
   ChunkManager,
   ChunkTransition,
@@ -14,8 +19,11 @@ import {
 } from './chunk-renderer';
 import type { WorldGenerator } from './generation-contracts';
 import type {
+  BlockId,
   ChunkCoordinate,
   ChunkKey,
+  GeneratedChunk,
+  TileCoordinate,
   WorldSeed,
 } from './world-types';
 
@@ -24,19 +32,16 @@ export interface ChunkDeltaStore {
   save(delta: ChunkDelta): Promise<void>;
 }
 
-export class EmptyChunkDeltaStore implements ChunkDeltaStore {
-  async load(): Promise<null> {
-    return null;
-  }
-
-  async save(): Promise<void> {
-    // 플레이어 변경이 없는 5단계에서는 저장할 delta가 없습니다.
-  }
+interface RuntimeChunk {
+  readonly base: GeneratedChunk;
+  delta: ChunkDelta | null;
+  node: Node;
 }
 
-interface RuntimeChunk {
-  readonly data: LoadedChunk;
-  readonly node: Node;
+/** 월드 전체 기준 타일 좌표입니다. */
+export interface WorldTileCoordinate {
+  readonly x: number;
+  readonly y: number;
 }
 
 export class RuntimeChunkManager implements ChunkManager {
@@ -66,18 +71,15 @@ export class RuntimeChunkManager implements ChunkManager {
         this.worldSeed,
         coordinate,
       );
-      const node = this.renderer.createNode(base);
+      const node = this.renderer.createNode(mergeChunkWithDelta(base, delta));
       this.worldRoot.addChild(node);
-      this.loadedChunks.set(key, {
-        data: { base, delta },
-        node,
-      });
+      this.loadedChunks.set(key, { base, delta, node });
       loaded.push(key);
     }
 
     for (const [key, chunk] of this.loadedChunks) {
       if (desiredKeys.has(key)) continue;
-      if (chunk.data.delta) await this.deltaStore.save(chunk.data.delta);
+      if (chunk.delta) await this.deltaStore.save(chunk.delta);
       chunk.node.destroy();
       this.loadedChunks.delete(key);
       unloaded.push(key);
@@ -98,16 +100,75 @@ export class RuntimeChunkManager implements ChunkManager {
   }
 
   getLoadedChunk(coordinate: ChunkCoordinate): LoadedChunk | null {
-    return this.loadedChunks.get(toChunkKey(coordinate))?.data ?? null;
+    const chunk = this.loadedChunks.get(toChunkKey(coordinate));
+    return chunk ? { base: chunk.base, delta: chunk.delta } : null;
   }
 
   async flushAndUnloadAll(): Promise<void> {
     for (const chunk of this.loadedChunks.values()) {
-      if (chunk.data.delta) await this.deltaStore.save(chunk.data.delta);
+      if (chunk.delta) await this.deltaStore.save(chunk.delta);
       chunk.node.destroy();
     }
     this.loadedChunks.clear();
     this.solidColliders = [];
+  }
+
+  /** delta를 반영한 현재 블록을 반환합니다. 청크가 없으면 null입니다. */
+  getEffectiveBlockId(tile: WorldTileCoordinate): BlockId | null {
+    const chunk = this.getRuntimeChunkAt(tile);
+    if (!chunk) return null;
+
+    const local = toLocalTile(tile);
+    const override = chunk.delta?.blocks.find(
+      (block) => block.coordinate.x === local.x
+        && block.coordinate.y === local.y,
+    );
+    if (override) {
+      return override.blockId
+        ?? getGroundBlockId(chunk.base.terrain.biomeId);
+    }
+    return findBaseBlockId(chunk.base, local);
+  }
+
+  /**
+   * 블록 변경을 delta에 기록하고 즉시 저장·재렌더링합니다.
+   * blockId가 null이면 원본 블록을 제거한 상태입니다.
+   */
+  async applyBlockChange(
+    tile: WorldTileCoordinate,
+    blockId: BlockId | null,
+  ): Promise<boolean> {
+    const chunk = this.getRuntimeChunkAt(tile);
+    if (!chunk) return false;
+
+    const local = toLocalTile(tile);
+    const baseBlockId = findBaseBlockId(chunk.base, local);
+    const otherBlocks = (chunk.delta?.blocks ?? []).filter(
+      (block) => block.coordinate.x !== local.x
+        || block.coordinate.y !== local.y,
+    );
+    // 원본과 같은 값으로 되돌리면 delta 항목을 제거합니다.
+    const blocks: BlockDelta[] = blockId === baseBlockId
+      ? otherBlocks
+      : [...otherBlocks, { coordinate: local, blockId }];
+
+    chunk.delta = {
+      coordinate: chunk.base.coordinate,
+      revision: (chunk.delta?.revision ?? 0) + 1,
+      blocks,
+      removedGeneratedEntityIds: chunk.delta?.removedGeneratedEntityIds ?? [],
+      placedEntities: chunk.delta?.placedEntities ?? [],
+    };
+    await this.deltaStore.save(chunk.delta);
+
+    const parent = chunk.node.parent ?? this.worldRoot;
+    chunk.node.destroy();
+    chunk.node = this.renderer.createNode(
+      mergeChunkWithDelta(chunk.base, chunk.delta),
+    );
+    parent.addChild(chunk.node);
+    this.rebuildSolidColliders();
+    return true;
   }
 
   getLoadedCount(): number {
@@ -142,13 +203,22 @@ export class RuntimeChunkManager implements ChunkManager {
     return coordinates;
   }
 
+  private getRuntimeChunkAt(tile: WorldTileCoordinate): RuntimeChunk | null {
+    const coordinate = {
+      x: Math.floor(tile.x / CHUNK_SIZE_TILES),
+      y: Math.floor(tile.y / CHUNK_SIZE_TILES),
+    };
+    return this.loadedChunks.get(toChunkKey(coordinate)) ?? null;
+  }
+
   private rebuildSolidColliders(): void {
     const colliders: Rect[] = [];
     for (const chunk of this.loadedChunks.values()) {
-      const chunkOriginX = chunk.data.base.coordinate.x * CHUNK_SIZE_PIXELS;
-      const chunkOriginY = chunk.data.base.coordinate.y * CHUNK_SIZE_PIXELS;
-      for (const block of chunk.data.base.terrain.blocks) {
-        if (block.blockId !== 'rock' && block.blockId !== 'tree') continue;
+      const effective = mergeChunkWithDelta(chunk.base, chunk.delta);
+      const chunkOriginX = chunk.base.coordinate.x * CHUNK_SIZE_PIXELS;
+      const chunkOriginY = chunk.base.coordinate.y * CHUNK_SIZE_PIXELS;
+      for (const block of effective.terrain.blocks) {
+        if (!isSolidBlock(block.blockId)) continue;
         colliders.push(new Rect(
           chunkOriginX + block.coordinate.x * TILE_SIZE_PIXELS,
           chunkOriginY + block.coordinate.y * TILE_SIZE_PIXELS,
@@ -163,4 +233,63 @@ export class RuntimeChunkManager implements ChunkManager {
 
 export function toChunkKey(coordinate: ChunkCoordinate): ChunkKey {
   return `${coordinate.x},${coordinate.y}`;
+}
+
+function toLocalTile(tile: WorldTileCoordinate): TileCoordinate {
+  return {
+    x: ((tile.x % CHUNK_SIZE_TILES) + CHUNK_SIZE_TILES) % CHUNK_SIZE_TILES,
+    y: ((tile.y % CHUNK_SIZE_TILES) + CHUNK_SIZE_TILES) % CHUNK_SIZE_TILES,
+  };
+}
+
+function findBaseBlockId(
+  base: GeneratedChunk,
+  local: TileCoordinate,
+): BlockId | null {
+  return base.terrain.blocks.find(
+    (block) => block.coordinate.x === local.x
+      && block.coordinate.y === local.y,
+  )?.blockId ?? null;
+}
+
+/** Seed 원본 청크에 플레이어 delta를 겹쳐 현재 상태 청크를 만듭니다. */
+export function mergeChunkWithDelta(
+  base: GeneratedChunk,
+  delta: ChunkDelta | null,
+): GeneratedChunk {
+  if (!delta || (
+    delta.blocks.length === 0
+    && delta.removedGeneratedEntityIds.length === 0
+    && delta.placedEntities.length === 0
+  )) {
+    return base;
+  }
+
+  const overrides = new Map(
+    delta.blocks.map((block) => [
+      `${block.coordinate.x},${block.coordinate.y}`,
+      block.blockId,
+    ]),
+  );
+  const groundBlockId = getGroundBlockId(base.terrain.biomeId);
+  const blocks = base.terrain.blocks.map((block) => {
+    const key = `${block.coordinate.x},${block.coordinate.y}`;
+    if (!overrides.has(key)) return block;
+    return {
+      coordinate: block.coordinate,
+      blockId: overrides.get(key) ?? groundBlockId,
+    };
+  });
+
+  const removedIds = new Set(delta.removedGeneratedEntityIds);
+  const entries = [
+    ...base.content.entries.filter((entry) => !removedIds.has(entry.id)),
+    ...delta.placedEntities,
+  ];
+
+  return {
+    coordinate: base.coordinate,
+    terrain: { ...base.terrain, blocks },
+    content: { ...base.content, entries },
+  };
 }

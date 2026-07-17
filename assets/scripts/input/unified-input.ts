@@ -14,6 +14,7 @@ const { ccclass } = _decorator;
 
 const POINTER_DEAD_ZONE = 8;
 const POINTER_MAX_DISTANCE = 96;
+const TAP_MAX_DURATION_MS = 300;
 
 /**
  * 키보드와 포인터 드래그(마우스·터치)를 동일한 이동 벡터로 변환합니다.
@@ -27,8 +28,12 @@ export class UnifiedInput extends Component {
   private readonly keyboardDirection = new Vec2();
   private readonly pointerDirection = new Vec2();
 
+  private readonly pendingTapLocation = new Vec2();
   private activeTouchId: number | null = null;
   private isMouseDragging = false;
+  private pointerDownAtMs = 0;
+  private pointerMaxDistance = 0;
+  private hasPendingTap = false;
 
   protected onEnable(): void {
     input.on(Input.EventType.KEY_DOWN, this.onKeyDown, this);
@@ -66,6 +71,17 @@ export class UnifiedInput extends Component {
     return out;
   }
 
+  /**
+   * 드래그 없이 짧게 눌렀다 뗀 탭을 1회 소비합니다.
+   * 마우스 클릭과 터치 탭이 동일하게 처리됩니다.
+   */
+  consumeTap(out: Vec2): boolean {
+    if (!this.hasPendingTap) return false;
+    out.set(this.pendingTapLocation);
+    this.hasPendingTap = false;
+    return true;
+  }
+
   private onKeyDown(event: EventKeyboard): void {
     this.pressedKeys.add(event.keyCode);
   }
@@ -79,16 +95,19 @@ export class UnifiedInput extends Component {
     this.isMouseDragging = true;
     event.getUILocation(this.pointerStart);
     this.pointerCurrent.set(this.pointerStart);
+    this.beginPointerGesture();
   }
 
   private onMouseMove(event: EventMouse): void {
     if (!this.isMouseDragging) return;
     event.getUILocation(this.pointerCurrent);
+    this.trackPointerDistance();
   }
 
   private onMouseUp(event: EventMouse): void {
     if (event.getButton() !== EventMouse.BUTTON_LEFT) return;
     this.isMouseDragging = false;
+    this.finishPointerGesture();
     this.pointerCurrent.set(this.pointerStart);
   }
 
@@ -100,17 +119,41 @@ export class UnifiedInput extends Component {
     this.activeTouchId = touchId;
     event.getUILocation(this.pointerStart);
     this.pointerCurrent.set(this.pointerStart);
+    this.beginPointerGesture();
   }
 
   private onTouchMove(event: EventTouch): void {
     if (event.getID() !== this.activeTouchId) return;
     event.getUILocation(this.pointerCurrent);
+    this.trackPointerDistance();
   }
 
   private onTouchEnd(event: EventTouch): void {
     if (event.getID() !== this.activeTouchId) return;
     this.activeTouchId = null;
+    this.finishPointerGesture();
     this.pointerCurrent.set(this.pointerStart);
+  }
+
+  private beginPointerGesture(): void {
+    this.pointerDownAtMs = performance.now();
+    this.pointerMaxDistance = 0;
+  }
+
+  private trackPointerDistance(): void {
+    const distance = Vec2.distance(this.pointerCurrent, this.pointerStart);
+    this.pointerMaxDistance = Math.max(this.pointerMaxDistance, distance);
+  }
+
+  private finishPointerGesture(): void {
+    const duration = performance.now() - this.pointerDownAtMs;
+    if (
+      this.pointerMaxDistance <= POINTER_DEAD_ZONE
+      && duration <= TAP_MAX_DURATION_MS
+    ) {
+      this.pendingTapLocation.set(this.pointerCurrent);
+      this.hasPendingTap = true;
+    }
   }
 
   private readKeyboardDirection(out: Vec2): void {
@@ -151,6 +194,7 @@ export class UnifiedInput extends Component {
     this.pressedKeys.clear();
     this.activeTouchId = null;
     this.isMouseDragging = false;
+    this.hasPendingTap = false;
     this.pointerStart.set(0, 0);
     this.pointerCurrent.set(0, 0);
   }

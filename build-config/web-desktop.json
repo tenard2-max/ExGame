@@ -1,0 +1,17 @@
+{
+  "platform": "web-desktop",
+  "buildPath": "project://build",
+  "debug": true,
+  "sourceMaps": true,
+  "md5Cache": false,
+  "startScene": "607d5d9e-5c33-4eb0-9aa3-5408e834bf9a",
+  "packages": {
+    "web-desktop": {
+      "useWebGPU": false,
+      "resolution": {
+        "designWidth": 1280,
+        "designHeight": 720
+      }
+    }
+  }
+}

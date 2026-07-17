@@ -17,6 +17,14 @@ export class PlayerStatsModel {
     listener(this);
   }
 
+  /** 저장된 PlayerStats로 현재 상태를 덮어씁니다. */
+  loadFromStats(stats: PlayerStats): void {
+    this.level = stats.level;
+    this.experience = stats.experience;
+    this.health = Math.min(stats.health, this.getMaxHealth());
+    this.notify();
+  }
+
   getLevel(): number {
     return this.level;
   }

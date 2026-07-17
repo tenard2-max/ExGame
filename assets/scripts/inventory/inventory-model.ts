@@ -23,6 +23,16 @@ export class InventoryModel {
     return this.quantities.get(itemId) ?? 0;
   }
 
+  /** 저장된 InventoryState로 현재 소지품을 덮어씁니다. */
+  loadFromState(state: InventoryState): void {
+    this.quantities.clear();
+    for (const stack of state.stacks) {
+      this.quantities.set(stack.itemId, stack.quantity);
+    }
+    this.selectedHotbarIndex = 0;
+    this.notify();
+  }
+
   /** 스택 상한까지만 추가하고 실제 추가된 수량을 반환합니다. */
   add(itemId: ItemId, amount: number): number {
     const maxStack = getItemDefinition(itemId).maxStack;

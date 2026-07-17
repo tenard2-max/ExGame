@@ -10,15 +10,25 @@ import {
   view,
 } from 'cc';
 
-import { UnifiedInput } from '../input/unified-input';
 import { DefaultContentGenerationPipeline } from '../content/default-content-pipeline';
+import { UnifiedInput } from '../input/unified-input';
 import { InventoryModel } from '../inventory/inventory-model';
-import { CameraFollow } from '../player/camera-follow';
 import { BlockInteractionController } from '../player/block-interaction-controller';
+import { CameraFollow } from '../player/camera-follow';
 import { PlayerController } from '../player/player-controller';
 import { PlayerStatsModel } from '../player/player-stats-model';
-import { LocalStorageChunkDeltaStore } from '../save/local-storage-delta-store';
+import type { PlayerState } from '../player/player-types';
+import { IndexedDbSaveManager } from '../save/indexed-db-save-manager';
+import {
+  buildPlayerState,
+  decodePlayerPosition,
+} from '../save/player-state-codec';
+import { DefaultSaveMigrationRegistry } from '../save/save-migration';
+import { SaveSessionController } from '../save/save-session-controller';
+import { SlotChunkDeltaStore } from '../save/slot-chunk-delta-store';
+import type { SaveSlotId } from '../save/save-types';
 import { HotbarHud } from '../ui/hotbar-hud';
+import { SaveHud } from '../ui/save-hud';
 import { StatusHud } from '../ui/status-hud';
 import { ChunkRenderer } from '../world/chunk-renderer';
 import { ChunkStreamingController } from '../world/chunk-streaming-controller';
@@ -32,6 +42,7 @@ const { ccclass } = _decorator;
 const DESIGN_WIDTH = 1280;
 const DESIGN_HEIGHT = 720;
 const DEFAULT_WORLD_SEED = '851294';
+const DEFAULT_SLOT_ID: SaveSlotId = 'slot-1';
 const PLAYER_SPAWN_X = 256;
 const PLAYER_SPAWN_Y = 256;
 
@@ -43,11 +54,32 @@ export class GameBootstrap extends Component {
       DESIGN_HEIGHT,
       ResolutionPolicy.SHOW_ALL,
     );
+    void this.bootstrap();
+  }
 
+  private async bootstrap(): Promise<void> {
     const inputController = this.node.addComponent(UnifiedInput);
     const worldNode = this.createWorld();
     const terrainRoot = this.createTerrainRoot(worldNode);
     const playerNode = this.createPlayer(worldNode);
+    const inventory = new InventoryModel();
+    const playerStats = new PlayerStatsModel();
+    this.bindDebugListeners(inventory, playerStats);
+
+    const saveManager = new IndexedDbSaveManager(
+      new DefaultSaveMigrationRegistry(),
+    );
+    const saveGame = await this.ensureSaveSlot(
+      saveManager,
+      inventory,
+      playerStats,
+    );
+    const worldSeed = saveGame.world.seed;
+    const restored = decodePlayerPosition(saveGame.player.position);
+    playerNode.setPosition(restored.x, restored.y);
+    inventory.loadFromState(saveGame.player.inventory);
+    playerStats.loadFromStats(saveGame.player.stats);
+
     const generator = new DefaultWorldGenerator(
       new DefaultSeedDeriver(),
       new DefaultWorldGenerationPipeline(),
@@ -55,21 +87,107 @@ export class GameBootstrap extends Component {
     );
     const chunkManager = new RuntimeChunkManager(
       terrainRoot,
-      DEFAULT_WORLD_SEED,
+      worldSeed,
       generator,
       new ChunkRenderer(),
-      new LocalStorageChunkDeltaStore(DEFAULT_WORLD_SEED),
+      new SlotChunkDeltaStore(saveManager, DEFAULT_SLOT_ID),
     );
-    const playerController = playerNode.addComponent(PlayerController);
-    playerController.configure(
-      inputController,
-      () => chunkManager.getSolidColliders(),
-    );
+    playerNode
+      .addComponent(PlayerController)
+      .configure(inputController, () => chunkManager.getSolidColliders());
     worldNode
       .addComponent(ChunkStreamingController)
       .configure(playerNode, chunkManager);
 
-    const inventory = new InventoryModel();
+    const cameraNode = this.node.getChildByName('Camera');
+    if (!cameraNode) return;
+
+    const hotbarNode = new Node('HotbarHud');
+    hotbarNode.layer = Layers.Enum.UI_2D;
+    this.node.addChild(hotbarNode);
+    hotbarNode
+      .addComponent(HotbarHud)
+      .configure(inventory, cameraNode, DESIGN_HEIGHT);
+
+    const statusNode = new Node('StatusHud');
+    statusNode.layer = Layers.Enum.UI_2D;
+    this.node.addChild(statusNode);
+    const statusHud = statusNode.addComponent(StatusHud);
+    statusHud.configure(
+      playerStats,
+      cameraNode,
+      DESIGN_WIDTH,
+      DESIGN_HEIGHT,
+    );
+
+    const saveSession = this.node.addComponent(SaveSessionController);
+    saveSession.configure({
+      saveManager,
+      slotId: DEFAULT_SLOT_ID,
+      playerNode,
+      chunkManager,
+      inventory,
+      playerStats,
+      showMessage: (message) => statusHud.showMessage(message),
+    });
+
+    const saveHudNode = new Node('SaveHud');
+    saveHudNode.layer = Layers.Enum.UI_2D;
+    this.node.addChild(saveHudNode);
+    saveHudNode
+      .addComponent(SaveHud)
+      .configure(saveSession, cameraNode, DESIGN_WIDTH, DESIGN_HEIGHT);
+
+    this.node.addComponent(BlockInteractionController).configure(
+      inputController,
+      playerNode,
+      cameraNode,
+      chunkManager,
+      inventory,
+      playerStats,
+      worldSeed,
+      (message) => statusHud.showMessage(message),
+      () => playerNode.setPosition(PLAYER_SPAWN_X, PLAYER_SPAWN_Y),
+    );
+
+    cameraNode.addComponent(CameraFollow).configure(playerNode);
+
+    const firstSample = generator.generateChunk(worldSeed, { x: 0, y: 0 });
+    const secondSample = generator.generateChunk(worldSeed, { x: 0, y: 0 });
+    const debugGlobal = globalThis as typeof globalThis & {
+      __EXGAME_DEBUG__?: Record<string, unknown>;
+    };
+    debugGlobal.__EXGAME_DEBUG__ = {
+      ...debugGlobal.__EXGAME_DEBUG__,
+      deterministicMatch: JSON.stringify(firstSample)
+        === JSON.stringify(secondSample),
+      worldSeed,
+      chunkManager,
+      saveManager,
+      slotId: DEFAULT_SLOT_ID,
+    };
+  }
+
+  private async ensureSaveSlot(
+    saveManager: IndexedDbSaveManager,
+    inventory: InventoryModel,
+    playerStats: PlayerStatsModel,
+  ) {
+    const existing = await saveManager.loadSlot(DEFAULT_SLOT_ID);
+    if (existing) return existing;
+
+    const initialPlayer = createInitialPlayerState(inventory, playerStats);
+    return saveManager.createSlot({
+      slotId: DEFAULT_SLOT_ID,
+      worldSeed: DEFAULT_WORLD_SEED,
+      initialPlayer,
+    });
+  }
+
+  private bindDebugListeners(
+    inventory: InventoryModel,
+    playerStats: PlayerStatsModel,
+  ): void {
     inventory.addListener((model) => {
       const debugGlobal = globalThis as typeof globalThis & {
         __EXGAME_DEBUG__?: Record<string, unknown>;
@@ -80,8 +198,6 @@ export class GameBootstrap extends Component {
         selectedHotbarIndex: model.getSelectedHotbarIndex(),
       };
     });
-
-    const playerStats = new PlayerStatsModel();
     playerStats.addListener((model) => {
       const debugGlobal = globalThis as typeof globalThis & {
         __EXGAME_DEBUG__?: Record<string, unknown>;
@@ -91,62 +207,6 @@ export class GameBootstrap extends Component {
         playerStats: model.toStats(),
       };
     });
-
-    const cameraNode = this.node.getChildByName('Camera');
-    if (cameraNode) {
-      // 월드보다 늦게 그려지도록 Canvas의 마지막 자식으로 추가합니다.
-      const hotbarNode = new Node('HotbarHud');
-      hotbarNode.layer = Layers.Enum.UI_2D;
-      this.node.addChild(hotbarNode);
-      hotbarNode
-        .addComponent(HotbarHud)
-        .configure(inventory, cameraNode, DESIGN_HEIGHT);
-
-      const statusNode = new Node('StatusHud');
-      statusNode.layer = Layers.Enum.UI_2D;
-      this.node.addChild(statusNode);
-      const statusHud = statusNode.addComponent(StatusHud);
-      statusHud.configure(
-        playerStats,
-        cameraNode,
-        DESIGN_WIDTH,
-        DESIGN_HEIGHT,
-      );
-
-      const interaction = this.node.addComponent(BlockInteractionController);
-      interaction.configure(
-        inputController,
-        playerNode,
-        cameraNode,
-        chunkManager,
-        inventory,
-        playerStats,
-        DEFAULT_WORLD_SEED,
-        (message) => statusHud.showMessage(message),
-        () => playerNode.setPosition(PLAYER_SPAWN_X, PLAYER_SPAWN_Y),
-      );
-    }
-
-    const firstSample = generator.generateChunk(
-      DEFAULT_WORLD_SEED,
-      { x: 0, y: 0 },
-    );
-    const secondSample = generator.generateChunk(
-      DEFAULT_WORLD_SEED,
-      { x: 0, y: 0 },
-    );
-    const debugGlobal = globalThis as typeof globalThis & {
-      __EXGAME_DEBUG__?: Record<string, unknown>;
-    };
-    debugGlobal.__EXGAME_DEBUG__ = {
-      ...debugGlobal.__EXGAME_DEBUG__,
-      deterministicMatch: JSON.stringify(firstSample)
-        === JSON.stringify(secondSample),
-      worldSeed: DEFAULT_WORLD_SEED,
-      chunkManager,
-    };
-
-    cameraNode?.addComponent(CameraFollow).configure(playerNode);
   }
 
   private createWorld(): Node {
@@ -181,4 +241,16 @@ export class GameBootstrap extends Component {
     graphics.stroke();
     return playerNode;
   }
+}
+
+function createInitialPlayerState(
+  inventory: InventoryModel,
+  playerStats: PlayerStatsModel,
+): PlayerState {
+  return buildPlayerState(
+    PLAYER_SPAWN_X,
+    PLAYER_SPAWN_Y,
+    inventory,
+    playerStats,
+  );
 }

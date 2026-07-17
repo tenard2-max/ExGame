@@ -3,7 +3,6 @@ import {
   Color,
   Component,
   Graphics,
-  Label,
   Layers,
   Node,
   ResolutionPolicy,
@@ -13,10 +12,12 @@ import {
 
 import { UnifiedInput } from '../input/unified-input';
 import { DefaultContentGenerationPipeline } from '../content/default-content-pipeline';
+import { InventoryModel } from '../inventory/inventory-model';
 import { CameraFollow } from '../player/camera-follow';
 import { BlockInteractionController } from '../player/block-interaction-controller';
 import { PlayerController } from '../player/player-controller';
 import { LocalStorageChunkDeltaStore } from '../save/local-storage-delta-store';
+import { HotbarHud } from '../ui/hotbar-hud';
 import { ChunkRenderer } from '../world/chunk-renderer';
 import { ChunkStreamingController } from '../world/chunk-streaming-controller';
 import { DefaultWorldGenerator } from '../world/default-world-generator';
@@ -64,25 +65,35 @@ export class GameBootstrap extends Component {
       .addComponent(ChunkStreamingController)
       .configure(playerNode, chunkManager);
 
+    const inventory = new InventoryModel();
+    inventory.addListener((model) => {
+      const debugGlobal = globalThis as typeof globalThis & {
+        __EXGAME_DEBUG__?: Record<string, unknown>;
+      };
+      debugGlobal.__EXGAME_DEBUG__ = {
+        ...debugGlobal.__EXGAME_DEBUG__,
+        inventory: model.toState(),
+        selectedHotbarIndex: model.getSelectedHotbarIndex(),
+      };
+    });
+
     const cameraNode = this.node.getChildByName('Camera');
     if (cameraNode) {
-      const inventoryLabel = this.createInventoryHud(cameraNode);
+      // 월드보다 늦게 그려지도록 Canvas의 마지막 자식으로 추가합니다.
+      const hotbarNode = new Node('HotbarHud');
+      hotbarNode.layer = Layers.Enum.UI_2D;
+      this.node.addChild(hotbarNode);
+      hotbarNode
+        .addComponent(HotbarHud)
+        .configure(inventory, cameraNode, DESIGN_HEIGHT);
+
       const interaction = this.node.addComponent(BlockInteractionController);
       interaction.configure(
         inputController,
         playerNode,
         cameraNode,
         chunkManager,
-        (inventory) => {
-          inventoryLabel.string = formatInventory(inventory);
-          const debugGlobal = globalThis as typeof globalThis & {
-            __EXGAME_DEBUG__?: Record<string, unknown>;
-          };
-          debugGlobal.__EXGAME_DEBUG__ = {
-            ...debugGlobal.__EXGAME_DEBUG__,
-            inventory: Object.fromEntries(inventory),
-          };
-        },
+        inventory,
       );
     }
 
@@ -106,24 +117,6 @@ export class GameBootstrap extends Component {
     };
 
     cameraNode?.addComponent(CameraFollow).configure(playerNode);
-  }
-
-  /** 카메라를 따라다니는 화면 고정 인벤토리 표시입니다. */
-  private createInventoryHud(cameraNode: Node): Label {
-    const hudNode = new Node('InventoryHud');
-    hudNode.layer = Layers.Enum.UI_2D;
-    cameraNode.addChild(hudNode);
-    hudNode.setPosition(-DESIGN_WIDTH / 2 + 20, DESIGN_HEIGHT / 2 - 20);
-
-    const transform = hudNode.addComponent(UITransform);
-    transform.setAnchorPoint(0, 1);
-
-    const label = hudNode.addComponent(Label);
-    label.fontSize = 24;
-    label.lineHeight = 30;
-    label.color = new Color(235, 245, 255, 255);
-    label.string = formatInventory(new Map());
-    return label;
   }
 
   private createWorld(): Node {
@@ -158,16 +151,4 @@ export class GameBootstrap extends Component {
     graphics.stroke();
     return playerNode;
   }
-}
-
-const ITEM_DISPLAY_NAMES: Readonly<Record<string, string>> = {
-  rock: '돌',
-  wood: '나무',
-};
-
-function formatInventory(inventory: ReadonlyMap<string, number>): string {
-  const parts = Object.entries(ITEM_DISPLAY_NAMES).map(
-    ([itemId, name]) => `${name} ${inventory.get(itemId) ?? 0}`,
-  );
-  return parts.join('   ');
 }

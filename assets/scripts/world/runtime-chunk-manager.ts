@@ -5,6 +5,7 @@ import {
   CHUNK_SIZE_TILES,
   MAX_LOADED_CHUNKS,
 } from '../core/schema';
+import type { GeneratedContent } from '../content/content-types';
 import type { BlockDelta, ChunkDelta } from '../save/save-types';
 import { getGroundBlockId, isSolidBlock } from './block-registry';
 import type {
@@ -22,6 +23,7 @@ import type {
   BlockId,
   ChunkCoordinate,
   ChunkKey,
+  EntityId,
   GeneratedChunk,
   TileCoordinate,
   WorldSeed,
@@ -130,6 +132,44 @@ export class RuntimeChunkManager implements ChunkManager {
     return findBaseBlockId(chunk.base, local);
   }
 
+  /** delta를 반영해 해당 타일에 남아 있는 콘텐츠 엔티티를 반환합니다. */
+  getContentEntitiesAt(
+    tile: WorldTileCoordinate,
+  ): ReadonlyArray<GeneratedContent> {
+    const chunk = this.getRuntimeChunkAt(tile);
+    if (!chunk) return [];
+
+    const local = toLocalTile(tile);
+    const effective = mergeChunkWithDelta(chunk.base, chunk.delta);
+    return effective.content.entries.filter(
+      (entry) => entry.coordinate.x === local.x
+        && entry.coordinate.y === local.y,
+    );
+  }
+
+  /** 생성된 엔티티(광맥 등) 제거를 delta에 기록하고 저장·재렌더링합니다. */
+  async applyEntityRemoval(
+    tile: WorldTileCoordinate,
+    entityId: EntityId,
+  ): Promise<boolean> {
+    const chunk = this.getRuntimeChunkAt(tile);
+    if (!chunk) return false;
+
+    const removedIds = chunk.delta?.removedGeneratedEntityIds ?? [];
+    if (removedIds.includes(entityId)) return false;
+
+    chunk.delta = {
+      coordinate: chunk.base.coordinate,
+      revision: (chunk.delta?.revision ?? 0) + 1,
+      blocks: chunk.delta?.blocks ?? [],
+      removedGeneratedEntityIds: [...removedIds, entityId],
+      placedEntities: chunk.delta?.placedEntities ?? [],
+    };
+    await this.deltaStore.save(chunk.delta);
+    this.rerenderChunk(chunk);
+    return true;
+  }
+
   /**
    * 블록 변경을 delta에 기록하고 즉시 저장·재렌더링합니다.
    * blockId가 null이면 원본 블록을 제거한 상태입니다.
@@ -160,7 +200,11 @@ export class RuntimeChunkManager implements ChunkManager {
       placedEntities: chunk.delta?.placedEntities ?? [],
     };
     await this.deltaStore.save(chunk.delta);
+    this.rerenderChunk(chunk);
+    return true;
+  }
 
+  private rerenderChunk(chunk: RuntimeChunk): void {
     const parent = chunk.node.parent ?? this.worldRoot;
     chunk.node.destroy();
     chunk.node = this.renderer.createNode(
@@ -168,7 +212,6 @@ export class RuntimeChunkManager implements ChunkManager {
     );
     parent.addChild(chunk.node);
     this.rebuildSolidColliders();
-    return true;
   }
 
   getLoadedCount(): number {

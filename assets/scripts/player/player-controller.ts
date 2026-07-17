@@ -6,6 +6,7 @@ const { ccclass } = _decorator;
 
 const PLAYER_HALF_SIZE = 20;
 const DEFAULT_MOVE_SPEED = 260;
+type ColliderProvider = () => ReadonlyArray<Rect>;
 
 export enum PlayerAnimationState {
   Idle = 'idle',
@@ -20,17 +21,19 @@ export class PlayerController extends Component {
   private readonly direction = new Vec2();
   private readonly nextPosition = new Vec3();
   private inputSource: UnifiedInput | null = null;
-  private colliders: ReadonlyArray<Rect> = [];
+  private colliderProvider: ColliderProvider = () => [];
   private moveSpeed = DEFAULT_MOVE_SPEED;
   private animationState = PlayerAnimationState.Idle;
 
   configure(
     inputSource: UnifiedInput,
-    colliders: ReadonlyArray<Rect>,
+    colliders: ReadonlyArray<Rect> | ColliderProvider,
     moveSpeed = DEFAULT_MOVE_SPEED,
   ): void {
     this.inputSource = inputSource;
-    this.colliders = colliders;
+    this.colliderProvider = typeof colliders === 'function'
+      ? colliders
+      : () => colliders;
     this.moveSpeed = moveSpeed;
   }
 
@@ -66,7 +69,7 @@ export class PlayerController extends Component {
     const playerBottom = centerY - PLAYER_HALF_SIZE;
     const playerTop = centerY + PLAYER_HALF_SIZE;
 
-    return this.colliders.some((collider) => (
+    return this.colliderProvider().some((collider) => (
       playerRight > collider.x
       && playerLeft < collider.x + collider.width
       && playerTop > collider.y

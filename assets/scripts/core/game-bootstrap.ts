@@ -5,26 +5,30 @@ import {
   Graphics,
   Layers,
   Node,
-  Rect,
   ResolutionPolicy,
   UITransform,
   view,
 } from 'cc';
 
 import { UnifiedInput } from '../input/unified-input';
+import { DefaultContentGenerationPipeline } from '../content/default-content-pipeline';
 import { CameraFollow } from '../player/camera-follow';
 import { PlayerController } from '../player/player-controller';
+import { ChunkRenderer } from '../world/chunk-renderer';
+import { ChunkStreamingController } from '../world/chunk-streaming-controller';
+import { DefaultWorldGenerator } from '../world/default-world-generator';
+import { DefaultWorldGenerationPipeline } from '../world/default-world-pipeline';
+import { DefaultSeedDeriver } from '../world/deterministic-random';
+import {
+  EmptyChunkDeltaStore,
+  RuntimeChunkManager,
+} from '../world/runtime-chunk-manager';
 
 const { ccclass } = _decorator;
 
 const DESIGN_WIDTH = 1280;
 const DESIGN_HEIGHT = 720;
-
-const DEMO_COLLIDERS: ReadonlyArray<Rect> = [
-  new Rect(180, -80, 180, 80),
-  new Rect(-420, 180, 240, 64),
-  new Rect(-120, -360, 80, 220),
-];
+const DEFAULT_WORLD_SEED = '851294';
 
 @ccclass('GameBootstrap')
 export class GameBootstrap extends Component {
@@ -37,9 +41,45 @@ export class GameBootstrap extends Component {
 
     const inputController = this.node.addComponent(UnifiedInput);
     const worldNode = this.createWorld();
+    const terrainRoot = this.createTerrainRoot(worldNode);
     const playerNode = this.createPlayer(worldNode);
+    const generator = new DefaultWorldGenerator(
+      new DefaultSeedDeriver(),
+      new DefaultWorldGenerationPipeline(),
+      new DefaultContentGenerationPipeline(),
+    );
+    const chunkManager = new RuntimeChunkManager(
+      terrainRoot,
+      DEFAULT_WORLD_SEED,
+      generator,
+      new ChunkRenderer(),
+      new EmptyChunkDeltaStore(),
+    );
     const playerController = playerNode.addComponent(PlayerController);
-    playerController.configure(inputController, DEMO_COLLIDERS);
+    playerController.configure(
+      inputController,
+      () => chunkManager.getSolidColliders(),
+    );
+    worldNode
+      .addComponent(ChunkStreamingController)
+      .configure(playerNode, chunkManager);
+
+    const firstSample = generator.generateChunk(
+      DEFAULT_WORLD_SEED,
+      { x: 0, y: 0 },
+    );
+    const secondSample = generator.generateChunk(
+      DEFAULT_WORLD_SEED,
+      { x: 0, y: 0 },
+    );
+    const debugGlobal = globalThis as typeof globalThis & {
+      __EXGAME_DEBUG__?: Record<string, unknown>;
+    };
+    debugGlobal.__EXGAME_DEBUG__ = {
+      deterministicMatch: JSON.stringify(firstSample)
+        === JSON.stringify(secondSample),
+      worldSeed: DEFAULT_WORLD_SEED,
+    };
 
     const cameraNode = this.node.getChildByName('Camera');
     cameraNode?.addComponent(CameraFollow).configure(playerNode);
@@ -49,18 +89,22 @@ export class GameBootstrap extends Component {
     const worldNode = new Node('World');
     worldNode.layer = Layers.Enum.UI_2D;
     this.node.addChild(worldNode);
-    worldNode.addComponent(UITransform).setContentSize(4096, 4096);
-
-    const graphics = worldNode.addComponent(Graphics);
-    this.drawGrid(graphics);
-    this.drawObstacles(graphics);
+    worldNode.addComponent(UITransform).setContentSize(65536, 65536);
     return worldNode;
+  }
+
+  private createTerrainRoot(worldNode: Node): Node {
+    const terrainRoot = new Node('Terrain');
+    terrainRoot.layer = Layers.Enum.UI_2D;
+    worldNode.addChild(terrainRoot);
+    return terrainRoot;
   }
 
   private createPlayer(worldNode: Node): Node {
     const playerNode = new Node('Player');
     playerNode.layer = Layers.Enum.UI_2D;
     worldNode.addChild(playerNode);
+    playerNode.setPosition(256, 256);
     playerNode.addComponent(UITransform).setContentSize(40, 40);
 
     const graphics = playerNode.addComponent(Graphics);
@@ -72,43 +116,5 @@ export class GameBootstrap extends Component {
     graphics.roundRect(-20, -20, 40, 40, 8);
     graphics.stroke();
     return playerNode;
-  }
-
-  private drawGrid(graphics: Graphics): void {
-    graphics.strokeColor = new Color(45, 58, 72, 255);
-    graphics.lineWidth = 1;
-
-    for (let coordinate = -2048; coordinate <= 2048; coordinate += 64) {
-      graphics.moveTo(coordinate, -2048);
-      graphics.lineTo(coordinate, 2048);
-      graphics.moveTo(-2048, coordinate);
-      graphics.lineTo(2048, coordinate);
-    }
-    graphics.stroke();
-  }
-
-  private drawObstacles(graphics: Graphics): void {
-    graphics.fillColor = new Color(120, 92, 70, 255);
-    graphics.strokeColor = new Color(190, 150, 105, 255);
-    graphics.lineWidth = 3;
-
-    for (const collider of DEMO_COLLIDERS) {
-      graphics.roundRect(
-        collider.x,
-        collider.y,
-        collider.width,
-        collider.height,
-        10,
-      );
-      graphics.fill();
-      graphics.roundRect(
-        collider.x,
-        collider.y,
-        collider.width,
-        collider.height,
-        10,
-      );
-      graphics.stroke();
-    }
   }
 }

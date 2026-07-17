@@ -3,6 +3,8 @@ import {
   Color,
   Component,
   EventKeyboard,
+  EventMouse,
+  EventTouch,
   Graphics,
   Input,
   input,
@@ -11,16 +13,21 @@ import {
   Layers,
   Node,
   UITransform,
+  Vec2,
 } from 'cc';
 
 import type { SaveSessionController } from '../save/save-session-controller';
+import {
+  DESIGN_HEIGHT,
+  DESIGN_WIDTH,
+  hitTestSaveButton,
+  SAVE_BUTTON_GAP,
+  SAVE_BUTTON_HEIGHT,
+  SAVE_BUTTON_WIDTH,
+  SAVE_MARGIN,
+} from './hud-layout';
 
 const { ccclass } = _decorator;
-
-const BUTTON_WIDTH = 120;
-const BUTTON_HEIGHT = 40;
-const BUTTON_GAP = 10;
-const MARGIN = 18;
 
 interface SaveButton {
   readonly keyCode: KeyCode;
@@ -30,26 +37,21 @@ interface SaveButton {
 
 /**
  * 우측 상단 세이브 버튼과 단축키(S/L/E/I)를 제공합니다.
- * 월드보다 늦게 그리도록 Canvas 마지막 자식으로 두고 카메라를 따라갑니다.
+ * 마우스 클릭과 터치 탭으로도 동일하게 동작합니다.
  */
 @ccclass('SaveHud')
 export class SaveHud extends Component {
+  private readonly pointerLocation = new Vec2();
   private cameraNode: Node | null = null;
   private saveSession: SaveSessionController | null = null;
-  private offsetX = 0;
-  private offsetY = 0;
   private buttons: SaveButton[] = [];
 
   configure(
     saveSession: SaveSessionController,
     cameraNode: Node,
-    designWidth: number,
-    designHeight: number,
   ): void {
     this.saveSession = saveSession;
     this.cameraNode = cameraNode;
-    this.offsetX = designWidth / 2 - MARGIN;
-    this.offsetY = designHeight / 2 - MARGIN;
     this.buttons = [
       {
         keyCode: KeyCode.KEY_S,
@@ -77,18 +79,22 @@ export class SaveHud extends Component {
 
   protected onEnable(): void {
     input.on(Input.EventType.KEY_DOWN, this.onKeyDown, this);
+    input.on(Input.EventType.MOUSE_UP, this.onMouseUp, this);
+    input.on(Input.EventType.TOUCH_END, this.onTouchEnd, this);
   }
 
   protected onDisable(): void {
     input.off(Input.EventType.KEY_DOWN, this.onKeyDown, this);
+    input.off(Input.EventType.MOUSE_UP, this.onMouseUp, this);
+    input.off(Input.EventType.TOUCH_END, this.onTouchEnd, this);
   }
 
   protected lateUpdate(): void {
     if (!this.cameraNode) return;
     const camera = this.cameraNode.position;
     this.node.setPosition(
-      camera.x + this.offsetX,
-      camera.y + this.offsetY,
+      camera.x + DESIGN_WIDTH / 2 - SAVE_MARGIN,
+      camera.y + DESIGN_HEIGHT / 2 - SAVE_MARGIN,
       0,
     );
   }
@@ -100,37 +106,56 @@ export class SaveHud extends Component {
     button?.action();
   }
 
+  private onMouseUp(event: EventMouse): void {
+    if (event.getButton() !== EventMouse.BUTTON_LEFT) return;
+    event.getUILocation(this.pointerLocation);
+    this.activateAtPointer();
+  }
+
+  private onTouchEnd(event: EventTouch): void {
+    event.getUILocation(this.pointerLocation);
+    this.activateAtPointer();
+  }
+
+  private activateAtPointer(): void {
+    const index = hitTestSaveButton(
+      this.pointerLocation.x,
+      this.pointerLocation.y,
+    );
+    if (index !== null) this.buttons[index]?.action();
+  }
+
   private buildButtons(): void {
     this.buttons.forEach((button, index) => {
       const buttonNode = new Node(`SaveButton${index}`);
       buttonNode.layer = Layers.Enum.UI_2D;
       this.node.addChild(buttonNode);
       buttonNode.setPosition(
-        -BUTTON_WIDTH / 2,
-        -index * (BUTTON_HEIGHT + BUTTON_GAP) - BUTTON_HEIGHT / 2,
+        -SAVE_BUTTON_WIDTH / 2,
+        -index * (SAVE_BUTTON_HEIGHT + SAVE_BUTTON_GAP) - SAVE_BUTTON_HEIGHT / 2,
       );
       buttonNode
         .addComponent(UITransform)
-        .setContentSize(BUTTON_WIDTH, BUTTON_HEIGHT);
+        .setContentSize(SAVE_BUTTON_WIDTH, SAVE_BUTTON_HEIGHT);
 
       const graphics = buttonNode.addComponent(Graphics);
       graphics.fillColor = new Color(28, 38, 52, 220);
       graphics.roundRect(
-        -BUTTON_WIDTH / 2,
-        -BUTTON_HEIGHT / 2,
-        BUTTON_WIDTH,
-        BUTTON_HEIGHT,
-        8,
+        -SAVE_BUTTON_WIDTH / 2,
+        -SAVE_BUTTON_HEIGHT / 2,
+        SAVE_BUTTON_WIDTH,
+        SAVE_BUTTON_HEIGHT,
+        10,
       );
       graphics.fill();
       graphics.strokeColor = new Color(120, 150, 180, 255);
       graphics.lineWidth = 2;
       graphics.roundRect(
-        -BUTTON_WIDTH / 2,
-        -BUTTON_HEIGHT / 2,
-        BUTTON_WIDTH,
-        BUTTON_HEIGHT,
-        8,
+        -SAVE_BUTTON_WIDTH / 2,
+        -SAVE_BUTTON_HEIGHT / 2,
+        SAVE_BUTTON_WIDTH,
+        SAVE_BUTTON_HEIGHT,
+        10,
       );
       graphics.stroke();
 

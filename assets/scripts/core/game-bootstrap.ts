@@ -28,6 +28,7 @@ import { SaveSessionController } from '../save/save-session-controller';
 import { SlotChunkDeltaStore } from '../save/slot-chunk-delta-store';
 import type { SaveSlotId } from '../save/save-types';
 import { HotbarHud } from '../ui/hotbar-hud';
+import { DESIGN_HEIGHT, DESIGN_WIDTH } from '../ui/hud-layout';
 import { SaveHud } from '../ui/save-hud';
 import { StatusHud } from '../ui/status-hud';
 import { ChunkRenderer } from '../world/chunk-renderer';
@@ -39,8 +40,6 @@ import { RuntimeChunkManager } from '../world/runtime-chunk-manager';
 
 const { ccclass } = _decorator;
 
-const DESIGN_WIDTH = 1280;
-const DESIGN_HEIGHT = 720;
 const DEFAULT_WORLD_SEED = '851294';
 const DEFAULT_SLOT_ID: SaveSlotId = 'slot-1';
 const PLAYER_SPAWN_X = 256;
@@ -105,9 +104,7 @@ export class GameBootstrap extends Component {
     const hotbarNode = new Node('HotbarHud');
     hotbarNode.layer = Layers.Enum.UI_2D;
     this.node.addChild(hotbarNode);
-    hotbarNode
-      .addComponent(HotbarHud)
-      .configure(inventory, cameraNode, DESIGN_HEIGHT);
+    hotbarNode.addComponent(HotbarHud).configure(inventory, cameraNode);
 
     const statusNode = new Node('StatusHud');
     statusNode.layer = Layers.Enum.UI_2D;
@@ -136,7 +133,7 @@ export class GameBootstrap extends Component {
     this.node.addChild(saveHudNode);
     saveHudNode
       .addComponent(SaveHud)
-      .configure(saveSession, cameraNode, DESIGN_WIDTH, DESIGN_HEIGHT);
+      .configure(saveSession, cameraNode);
 
     this.node.addComponent(BlockInteractionController).configure(
       inputController,

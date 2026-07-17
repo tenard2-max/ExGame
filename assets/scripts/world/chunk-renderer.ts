@@ -94,36 +94,62 @@ export class ChunkRenderer {
       if (hasContent) graphics.fill();
     }
 
-    for (const entry of chunk.content.entries) {
-      const centerX = (entry.coordinate.x + 0.5) * TILE_SIZE_PIXELS;
-      const centerY = (entry.coordinate.y + 0.5) * TILE_SIZE_PIXELS;
-      const monsterColor = MONSTER_COLORS[entry.typeId];
-
-      if (monsterColor) {
-        graphics.fillColor = monsterColor;
-        graphics.circle(centerX, centerY, 10);
-        graphics.fill();
-        graphics.strokeColor = new Color(20, 20, 26, 255);
-        graphics.lineWidth = 2;
-        graphics.circle(centerX, centerY, 10);
-        graphics.stroke();
-      } else if (entry.typeId === 'treasure-chest') {
-        graphics.fillColor = TREASURE_COLOR;
-        graphics.rect(centerX - 9, centerY - 7, 18, 14);
-        graphics.fill();
-      } else if (entry.typeId === 'npc-villager') {
-        graphics.fillColor = NPC_COLOR;
-        graphics.circle(centerX, centerY, 8);
-        graphics.fill();
-      } else if (entry.typeId === 'dungeon-entrance') {
-        graphics.fillColor = DUNGEON_COLOR;
-        graphics.rect(centerX - 12, centerY - 12, 24, 24);
-        graphics.fill();
-        graphics.fillColor = new Color(30, 12, 44, 255);
-        graphics.circle(centerX, centerY, 6);
-        graphics.fill();
+    // 같은 색상끼리 묶어 fill 횟수를 줄입니다.
+    for (const [typeId, color] of Object.entries(MONSTER_COLORS)) {
+      graphics.fillColor = color;
+      let hasMonster = false;
+      for (const entry of chunk.content.entries) {
+        if (entry.typeId !== typeId) continue;
+        hasMonster = true;
+        graphics.circle(
+          (entry.coordinate.x + 0.5) * TILE_SIZE_PIXELS,
+          (entry.coordinate.y + 0.5) * TILE_SIZE_PIXELS,
+          10,
+        );
       }
+      if (hasMonster) graphics.fill();
     }
+
+    graphics.fillColor = TREASURE_COLOR;
+    let hasTreasure = false;
+    for (const entry of chunk.content.entries) {
+      if (entry.typeId !== 'treasure-chest') continue;
+      hasTreasure = true;
+      graphics.rect(
+        entry.coordinate.x * TILE_SIZE_PIXELS + 7,
+        entry.coordinate.y * TILE_SIZE_PIXELS + 9,
+        18,
+        14,
+      );
+    }
+    if (hasTreasure) graphics.fill();
+
+    graphics.fillColor = NPC_COLOR;
+    let hasNpc = false;
+    for (const entry of chunk.content.entries) {
+      if (entry.typeId !== 'npc-villager') continue;
+      hasNpc = true;
+      graphics.circle(
+        (entry.coordinate.x + 0.5) * TILE_SIZE_PIXELS,
+        (entry.coordinate.y + 0.5) * TILE_SIZE_PIXELS,
+        8,
+      );
+    }
+    if (hasNpc) graphics.fill();
+
+    graphics.fillColor = DUNGEON_COLOR;
+    let hasDungeon = false;
+    for (const entry of chunk.content.entries) {
+      if (entry.typeId !== 'dungeon-entrance') continue;
+      hasDungeon = true;
+      graphics.rect(
+        entry.coordinate.x * TILE_SIZE_PIXELS + 4,
+        entry.coordinate.y * TILE_SIZE_PIXELS + 4,
+        24,
+        24,
+      );
+    }
+    if (hasDungeon) graphics.fill();
   }
 
   private drawBorder(graphics: Graphics): void {

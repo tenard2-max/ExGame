@@ -84,4 +84,5 @@ finalChunk = generate(seed, x, y) + chunkDelta(x, y)
 - 광맥 채굴·자원 티어·인벤토리·핫바: 7단계 완료
 - 몬스터·보물·NPC·던전과 레벨·전투: 8단계 완료
 - IndexedDB 세이브 슬롯·플레이어 상태·import/export: 9단계 완료
-- UI·성능·호환성 다듬기: 10단계
+- 터치 HUD·성능·브라우저 호환 기준: 10단계 완료
+- 로컬 배포·오프라인 실행: 11단계

@@ -21,12 +21,14 @@ import type {
   WorldTileCoordinate,
 } from '../world/runtime-chunk-manager';
 import type { WorldSeed } from '../world/world-types';
+import {
+  DESIGN_HEIGHT,
+  DESIGN_WIDTH,
+  isUiLocationOverHud,
+} from '../ui/hud-layout';
 import type { PlayerStatsModel } from './player-stats-model';
 
 const { ccclass } = _decorator;
-
-const DESIGN_WIDTH = 1280;
-const DESIGN_HEIGHT = 720;
 /** 플레이어 중심에서 상호작용할 수 있는 최대 거리(px)입니다. */
 const INTERACTION_RANGE_PIXELS = TILE_SIZE_PIXELS * 3;
 
@@ -90,6 +92,8 @@ export class BlockInteractionController extends Component {
       return;
     }
     if (!this.inputSource.consumeTap(this.tapLocation)) return;
+    // 핫바·세이브 HUD 위의 탭은 월드 상호작용으로 보내지 않습니다.
+    if (isUiLocationOverHud(this.tapLocation.x, this.tapLocation.y)) return;
 
     const tile = this.toWorldTile(this.tapLocation);
     if (!this.isWithinReach(tile)) return;

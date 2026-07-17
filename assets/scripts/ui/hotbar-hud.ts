@@ -3,6 +3,8 @@ import {
   Color,
   Component,
   EventKeyboard,
+  EventMouse,
+  EventTouch,
   Graphics,
   Input,
   input,
@@ -11,6 +13,7 @@ import {
   Layers,
   Node,
   UITransform,
+  Vec2,
 } from 'cc';
 
 import type { InventoryModel } from '../inventory/inventory-model';
@@ -18,12 +21,16 @@ import {
   getItemDefinition,
   HOTBAR_ITEM_IDS,
 } from '../inventory/item-registry';
+import {
+  DESIGN_HEIGHT,
+  DESIGN_WIDTH,
+  getHotbarCenterY,
+  getHotbarSlotCenterX,
+  hitTestHotbarSlot,
+  HOTBAR_SLOT_SIZE,
+} from './hud-layout';
 
 const { ccclass } = _decorator;
-
-const SLOT_SIZE = 76;
-const SLOT_GAP = 10;
-const HOTBAR_BOTTOM_MARGIN = 26;
 
 const SLOT_KEY_CODES: ReadonlyArray<KeyCode> = [
   KeyCode.DIGIT_1,
@@ -39,43 +46,44 @@ interface HotbarSlotView {
 }
 
 /**
- * 화면 하단 고정 핫바입니다. 숫자 키 1~5로 슬롯을 선택하며
- * 선택된 슬롯의 아이템이 설치 재료로 사용됩니다.
- *
- * 월드보다 나중에 그려지도록 Canvas의 마지막 자식으로 두고,
- * 카메라 x·y를 따라가 화면에 고정된 것처럼 보이게 합니다.
+ * 화면 하단 고정 핫바입니다.
+ * 숫자 키 1~5 또는 터치/클릭으로 슬롯을 선택합니다.
  */
 @ccclass('HotbarHud')
 export class HotbarHud extends Component {
   private readonly slotViews: HotbarSlotView[] = [];
+  private readonly pointerLocation = new Vec2();
   private inventory: InventoryModel | null = null;
   private cameraNode: Node | null = null;
-  private bottomOffset = 0;
 
-  configure(
-    inventory: InventoryModel,
-    cameraNode: Node,
-    designHeight: number,
-  ): void {
+  configure(inventory: InventoryModel, cameraNode: Node): void {
     this.inventory = inventory;
     this.cameraNode = cameraNode;
-    this.bottomOffset = -designHeight / 2 + HOTBAR_BOTTOM_MARGIN + SLOT_SIZE / 2;
     this.buildSlots();
     inventory.addListener(() => this.refresh());
   }
 
   protected onEnable(): void {
     input.on(Input.EventType.KEY_DOWN, this.onKeyDown, this);
+    input.on(Input.EventType.MOUSE_UP, this.onMouseUp, this);
+    input.on(Input.EventType.TOUCH_END, this.onTouchEnd, this);
+  }
+
+  protected onDisable(): void {
+    input.off(Input.EventType.KEY_DOWN, this.onKeyDown, this);
+    input.off(Input.EventType.MOUSE_UP, this.onMouseUp, this);
+    input.off(Input.EventType.TOUCH_END, this.onTouchEnd, this);
   }
 
   protected lateUpdate(): void {
     if (!this.cameraNode) return;
     const camera = this.cameraNode.position;
-    this.node.setPosition(camera.x, camera.y + this.bottomOffset, 0);
-  }
-
-  protected onDisable(): void {
-    input.off(Input.EventType.KEY_DOWN, this.onKeyDown, this);
+    // UI 좌표 (DESIGN_WIDTH/2, getHotbarCenterY)에 맞추기 위해 카메라 기준 오프셋을 씁니다.
+    this.node.setPosition(
+      camera.x,
+      camera.y + getHotbarCenterY() - DESIGN_HEIGHT / 2,
+      0,
+    );
   }
 
   private onKeyDown(event: EventKeyboard): void {
@@ -83,25 +91,44 @@ export class HotbarHud extends Component {
     if (slotIndex >= 0) this.inventory?.selectHotbarIndex(slotIndex);
   }
 
-  private buildSlots(): void {
-    const totalWidth = HOTBAR_ITEM_IDS.length * SLOT_SIZE
-      + (HOTBAR_ITEM_IDS.length - 1) * SLOT_GAP;
+  private onMouseUp(event: EventMouse): void {
+    if (event.getButton() !== EventMouse.BUTTON_LEFT) return;
+    event.getUILocation(this.pointerLocation);
+    this.selectAtPointer();
+  }
 
+  private onTouchEnd(event: EventTouch): void {
+    event.getUILocation(this.pointerLocation);
+    this.selectAtPointer();
+  }
+
+  private selectAtPointer(): void {
+    const slotIndex = hitTestHotbarSlot(
+      this.pointerLocation.x,
+      this.pointerLocation.y,
+    );
+    if (slotIndex !== null) this.inventory?.selectHotbarIndex(slotIndex);
+  }
+
+  private buildSlots(): void {
     HOTBAR_ITEM_IDS.forEach((itemId, index) => {
       const slotNode = new Node(`Slot${index + 1}`);
       slotNode.layer = Layers.Enum.UI_2D;
       this.node.addChild(slotNode);
+      // 부모 원점이 화면 중앙 x·핫바 중앙 y이므로 슬롯은 상대 좌표로 둡니다.
       slotNode.setPosition(
-        -totalWidth / 2 + SLOT_SIZE / 2 + index * (SLOT_SIZE + SLOT_GAP),
+        getHotbarSlotCenterX(index) - DESIGN_WIDTH / 2,
         0,
       );
-      slotNode.addComponent(UITransform).setContentSize(SLOT_SIZE, SLOT_SIZE);
+      slotNode
+        .addComponent(UITransform)
+        .setContentSize(HOTBAR_SLOT_SIZE, HOTBAR_SLOT_SIZE);
       const background = slotNode.addComponent(Graphics);
 
       const nameNode = new Node('Name');
       nameNode.layer = Layers.Enum.UI_2D;
       slotNode.addChild(nameNode);
-      nameNode.setPosition(0, 12);
+      nameNode.setPosition(0, 14);
       const nameLabel = nameNode.addComponent(Label);
       nameLabel.fontSize = 18;
       nameLabel.lineHeight = 22;
@@ -111,7 +138,7 @@ export class HotbarHud extends Component {
       const countNode = new Node('Count');
       countNode.layer = Layers.Enum.UI_2D;
       slotNode.addChild(countNode);
-      countNode.setPosition(0, -14);
+      countNode.setPosition(0, -16);
       const countLabel = countNode.addComponent(Label);
       countLabel.fontSize = 22;
       countLabel.lineHeight = 26;
@@ -137,11 +164,11 @@ export class HotbarHud extends Component {
         ? new Color(70, 96, 128, 220)
         : new Color(24, 32, 44, 200);
       view.background.roundRect(
-        -SLOT_SIZE / 2,
-        -SLOT_SIZE / 2,
-        SLOT_SIZE,
-        SLOT_SIZE,
-        10,
+        -HOTBAR_SLOT_SIZE / 2,
+        -HOTBAR_SLOT_SIZE / 2,
+        HOTBAR_SLOT_SIZE,
+        HOTBAR_SLOT_SIZE,
+        12,
       );
       view.background.fill();
       view.background.strokeColor = isSelected
@@ -149,11 +176,11 @@ export class HotbarHud extends Component {
         : new Color(90, 104, 122, 255);
       view.background.lineWidth = isSelected ? 4 : 2;
       view.background.roundRect(
-        -SLOT_SIZE / 2,
-        -SLOT_SIZE / 2,
-        SLOT_SIZE,
-        SLOT_SIZE,
-        10,
+        -HOTBAR_SLOT_SIZE / 2,
+        -HOTBAR_SLOT_SIZE / 2,
+        HOTBAR_SLOT_SIZE,
+        HOTBAR_SLOT_SIZE,
+        12,
       );
       view.background.stroke();
     });

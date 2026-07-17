@@ -82,4 +82,5 @@ finalChunk = generate(seed, x, y) + chunkDelta(x, y)
 - 결정적 PRNG·지형·광석·3×3 청크 스트리밍: 5단계 완료
 - 채굴·설치와 변경분(delta) localStorage 저장: 6단계 완료
 - 광맥 채굴·자원 티어·인벤토리·핫바: 7단계 완료
+- 몬스터·보물·NPC·던전과 레벨·전투: 8단계 완료
 - IndexedDB 세이브 슬롯·플레이어 상태 영속화: 9단계

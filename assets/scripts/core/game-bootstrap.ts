@@ -16,8 +16,10 @@ import { InventoryModel } from '../inventory/inventory-model';
 import { CameraFollow } from '../player/camera-follow';
 import { BlockInteractionController } from '../player/block-interaction-controller';
 import { PlayerController } from '../player/player-controller';
+import { PlayerStatsModel } from '../player/player-stats-model';
 import { LocalStorageChunkDeltaStore } from '../save/local-storage-delta-store';
 import { HotbarHud } from '../ui/hotbar-hud';
+import { StatusHud } from '../ui/status-hud';
 import { ChunkRenderer } from '../world/chunk-renderer';
 import { ChunkStreamingController } from '../world/chunk-streaming-controller';
 import { DefaultWorldGenerator } from '../world/default-world-generator';
@@ -30,6 +32,8 @@ const { ccclass } = _decorator;
 const DESIGN_WIDTH = 1280;
 const DESIGN_HEIGHT = 720;
 const DEFAULT_WORLD_SEED = '851294';
+const PLAYER_SPAWN_X = 256;
+const PLAYER_SPAWN_Y = 256;
 
 @ccclass('GameBootstrap')
 export class GameBootstrap extends Component {
@@ -77,6 +81,17 @@ export class GameBootstrap extends Component {
       };
     });
 
+    const playerStats = new PlayerStatsModel();
+    playerStats.addListener((model) => {
+      const debugGlobal = globalThis as typeof globalThis & {
+        __EXGAME_DEBUG__?: Record<string, unknown>;
+      };
+      debugGlobal.__EXGAME_DEBUG__ = {
+        ...debugGlobal.__EXGAME_DEBUG__,
+        playerStats: model.toStats(),
+      };
+    });
+
     const cameraNode = this.node.getChildByName('Camera');
     if (cameraNode) {
       // 월드보다 늦게 그려지도록 Canvas의 마지막 자식으로 추가합니다.
@@ -87,6 +102,17 @@ export class GameBootstrap extends Component {
         .addComponent(HotbarHud)
         .configure(inventory, cameraNode, DESIGN_HEIGHT);
 
+      const statusNode = new Node('StatusHud');
+      statusNode.layer = Layers.Enum.UI_2D;
+      this.node.addChild(statusNode);
+      const statusHud = statusNode.addComponent(StatusHud);
+      statusHud.configure(
+        playerStats,
+        cameraNode,
+        DESIGN_WIDTH,
+        DESIGN_HEIGHT,
+      );
+
       const interaction = this.node.addComponent(BlockInteractionController);
       interaction.configure(
         inputController,
@@ -94,6 +120,10 @@ export class GameBootstrap extends Component {
         cameraNode,
         chunkManager,
         inventory,
+        playerStats,
+        DEFAULT_WORLD_SEED,
+        (message) => statusHud.showMessage(message),
+        () => playerNode.setPosition(PLAYER_SPAWN_X, PLAYER_SPAWN_Y),
       );
     }
 
@@ -138,7 +168,7 @@ export class GameBootstrap extends Component {
     const playerNode = new Node('Player');
     playerNode.layer = Layers.Enum.UI_2D;
     worldNode.addChild(playerNode);
-    playerNode.setPosition(256, 256);
+    playerNode.setPosition(PLAYER_SPAWN_X, PLAYER_SPAWN_Y);
     playerNode.addComponent(UITransform).setContentSize(40, 40);
 
     const graphics = playerNode.addComponent(Graphics);

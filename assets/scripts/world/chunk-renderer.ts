@@ -26,6 +26,16 @@ const ORE_COLORS: Readonly<Record<string, Color>> = {
   'ore-ark': new Color(72, 235, 224, 255),
 };
 
+const MONSTER_COLORS: Readonly<Record<string, Color>> = {
+  'monster-slime': new Color(120, 200, 90, 255),
+  'monster-wolf': new Color(160, 160, 175, 255),
+  'monster-golem': new Color(205, 92, 92, 255),
+};
+
+const TREASURE_COLOR = new Color(235, 195, 60, 255);
+const NPC_COLOR = new Color(240, 240, 250, 255);
+const DUNGEON_COLOR = new Color(150, 80, 200, 255);
+
 export class ChunkRenderer {
   createNode(chunk: GeneratedChunk): Node {
     const chunkNode = new Node(
@@ -82,6 +92,37 @@ export class ChunkRenderer {
         );
       }
       if (hasContent) graphics.fill();
+    }
+
+    for (const entry of chunk.content.entries) {
+      const centerX = (entry.coordinate.x + 0.5) * TILE_SIZE_PIXELS;
+      const centerY = (entry.coordinate.y + 0.5) * TILE_SIZE_PIXELS;
+      const monsterColor = MONSTER_COLORS[entry.typeId];
+
+      if (monsterColor) {
+        graphics.fillColor = monsterColor;
+        graphics.circle(centerX, centerY, 10);
+        graphics.fill();
+        graphics.strokeColor = new Color(20, 20, 26, 255);
+        graphics.lineWidth = 2;
+        graphics.circle(centerX, centerY, 10);
+        graphics.stroke();
+      } else if (entry.typeId === 'treasure-chest') {
+        graphics.fillColor = TREASURE_COLOR;
+        graphics.rect(centerX - 9, centerY - 7, 18, 14);
+        graphics.fill();
+      } else if (entry.typeId === 'npc-villager') {
+        graphics.fillColor = NPC_COLOR;
+        graphics.circle(centerX, centerY, 8);
+        graphics.fill();
+      } else if (entry.typeId === 'dungeon-entrance') {
+        graphics.fillColor = DUNGEON_COLOR;
+        graphics.rect(centerX - 12, centerY - 12, 24, 24);
+        graphics.fill();
+        graphics.fillColor = new Color(30, 12, 44, 255);
+        graphics.circle(centerX, centerY, 6);
+        graphics.fill();
+      }
     }
   }
 

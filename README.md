@@ -35,6 +35,20 @@ Windows 명령줄 빌드:
 출력은 `build/web-desktop/`에 생성되며 Git에는 포함하지 않습니다.
 빌드 설정은 `build-config/web-desktop.json`에 고정되어 있습니다.
 
+## 오프라인 실행 (권장)
+
+```powershell
+# Web 빌드 후 배포 패키지 생성
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-web.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-release.ps1
+
+# 또는 개발 빌드를 바로 오프라인 실행
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-offline.ps1
+```
+
+배포 ZIP을 받은 경우에는 폴더 안의 `run-offline.bat`을 더블클릭하면 됩니다.  
+자세한 내용은 [`docs/OFFLINE.md`](./docs/OFFLINE.md)를 참고하세요.
+
 ## 로컬 실행
 
 Web 빌드 결과는 `file://`로 직접 열지 않습니다. 빌드 폴더에서 정적 서버를 실행합니다.
@@ -93,4 +107,4 @@ assets/
 
 핵심 계약과 불변식은 [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)를 참고하세요.
 
-현재는 **10단계 UI·성능·호환성까지 완료**한 상태입니다. 터치 핫바/세이브 UI와 3×3 청크 성능 기준을 문서화했습니다.
+현재는 **11단계 로컬 배포·오프라인 실행까지 완료**한 상태입니다. `run-offline` 런처와 release ZIP 패키징이 준비되어 있습니다.

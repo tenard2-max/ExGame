@@ -85,4 +85,5 @@ finalChunk = generate(seed, x, y) + chunkDelta(x, y)
 - 몬스터·보물·NPC·던전과 레벨·전투: 8단계 완료
 - IndexedDB 세이브 슬롯·플레이어 상태·import/export: 9단계 완료
 - 터치 HUD·성능·브라우저 호환 기준: 10단계 완료
-- 로컬 배포·오프라인 실행: 11단계
+- 로컬 런처·release ZIP 오프라인 배포: 11단계 완료
+- GitHub 공개·NovelExplor 링크: 12단계

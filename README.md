@@ -107,4 +107,5 @@ assets/
 
 핵심 계약과 불변식은 [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)를 참고하세요.
 
-현재는 **11단계 로컬 배포·오프라인 실행까지 완료**한 상태입니다. `run-offline` 런처와 release ZIP 패키징이 준비되어 있습니다.
+현재는 **12단계 GitHub 공개·릴리스 준비까지 완료**한 상태입니다.
+실제 GitHub Releases 업로드는 원격 저장소 연결 후 [`docs/RELEASE.md`](./docs/RELEASE.md) 절차를 따르면 됩니다.

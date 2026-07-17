@@ -86,4 +86,4 @@ finalChunk = generate(seed, x, y) + chunkDelta(x, y)
 - IndexedDB 세이브 슬롯·플레이어 상태·import/export: 9단계 완료
 - 터치 HUD·성능·브라우저 호환 기준: 10단계 완료
 - 로컬 런처·release ZIP 오프라인 배포: 11단계 완료
-- GitHub 공개·NovelExplor 링크: 12단계
+- 릴리스 문서·NovelExplor 소개/다운로드 진입점: 12단계 완료

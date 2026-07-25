@@ -102,46 +102,23 @@ if (Test-Path -LiteralPath $stylePath) {
         $stylePatched = $styleText -replace 'background-color:\s*#fff(fff)?', 'background-color: #05070c'
     }
     if ($stylePatched -ne $styleText) {
-        Set-Content -LiteralPath $stylePath -Value $stylePatched -Encoding UTF8
+        $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+        [System.IO.File]::WriteAllText($stylePath, $stylePatched, $utf8NoBom)
         Write-Host "Patched style.css body background to #05070c"
     }
 }
 
-# 스크립트 로드 전에도 즉시 어두운 배경 + 로딩 문구
+# head 에는 style 만 (div를 head에 넣으면 HTML 파서가 깨져 SystemJS 미기동)
 $indexAfter = Get-Content -LiteralPath $indexPath -Raw -Encoding UTF8
 if ($indexAfter -notmatch 'exgame-boot-skin') {
-    $bootSkin = @'
-<style id="exgame-boot-skin">
-html, body { background: #05070c !important; color: #ffe7a8; }
-#exgame-boot-hint {
-  position: fixed; left: 50%; bottom: 8%; transform: translateX(-50%);
-  z-index: 2147482000; font-family: "Segoe UI", "Malgun Gothic", sans-serif;
-  font-size: 16px; opacity: 0.85; pointer-events: none;
-}
-</style>
-<div id="exgame-boot-hint">로딩 중…</div>
-<script>
-(function () {
-  function clearBootHint() {
-    var el = document.getElementById("exgame-boot-hint");
-    if (el) el.remove();
-  }
-  window.addEventListener("DOMContentLoaded", function () {
-    setTimeout(clearBootHint, 12000);
-  });
-  var obs = new MutationObserver(function () {
-    if (document.getElementById("exgame-splash-root")) clearBootHint();
-  });
-  obs.observe(document.documentElement, { childList: true, subtree: true });
-})();
-</script>
-'@
-    $indexBoot = $indexAfter -replace '</head>', ($bootSkin + "`n</head>")
-    if ($indexBoot -eq $indexAfter) {
-        $indexBoot = $indexAfter -replace '<body>', ("<body>`n" + $bootSkin)
-    }
-    Set-Content -LiteralPath $indexPath -Value $indexBoot -Encoding UTF8
-    Write-Host "Injected early boot skin into index.html"
+    $bootStyle = '<style id="exgame-boot-skin">html,body{background:#05070c!important;}</style>'
+    $indexBoot = $indexAfter -replace '</head>', ($bootStyle + "`r`n</head>")
+    # body 시작 직후에 로딩 힌트 (ASCII only — 인코딩 깨짐 방지)
+    $bootHint = '<div id="exgame-boot-hint" style="position:fixed;left:50%;bottom:8%;transform:translateX(-50%);z-index:2147482000;color:#ffe7a8;font:16px/1.4 sans-serif;opacity:.85;pointer-events:none">Loading...</div><script>(function(){function c(){var e=document.getElementById("exgame-boot-hint");if(e)e.remove()}setTimeout(c,15000);var o=new MutationObserver(function(){if(document.getElementById("exgame-splash-root")){c();o.disconnect()}});o.observe(document.documentElement,{childList:true,subtree:true})})();</script>'
+    $indexBoot = $indexBoot -replace '<body>', ("<body>`r`n" + $bootHint)
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($indexPath, $indexBoot, $utf8NoBom)
+    Write-Host "Injected early boot skin into index.html (style in head, hint in body)"
 }
 
 & $syncScript -OutputPath $outputPath

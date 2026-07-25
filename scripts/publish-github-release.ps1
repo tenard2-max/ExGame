@@ -79,8 +79,10 @@ $versionObj = [ordered]@{
 }
 $versionJson = ($versionObj | ConvertTo-Json -Compress)
 $versionJsonPath = Join-Path $outDir "version.json"
-Set-Content -LiteralPath $versionJsonPath -Value $versionJson -Encoding UTF8
-Set-Content -LiteralPath (Join-Path $webDesktop "version.json") -Value $versionJson -Encoding UTF8
+# UTF8 no BOM — Android JSONObject 가 BOM 있으면 파싱 실패할 수 있음
+$utf8NoBom = New-Object System.Text.UTF8Encoding $false
+[System.IO.File]::WriteAllText($versionJsonPath, $versionJson, $utf8NoBom)
+[System.IO.File]::WriteAllText((Join-Path $webDesktop "version.json"), $versionJson, $utf8NoBom)
 Write-Host "Wrote version.json ($Version / $versionCode)"
 
 Write-Host '[publish] PC ZIP + Android www + APK...'
@@ -88,7 +90,7 @@ Write-Host '[publish] PC ZIP + Android www + APK...'
 
 $wwwAsset = Join-Path $projectPath "mobile\android\app\src\main\assets\www"
 if (Test-Path -LiteralPath $wwwAsset) {
-    Set-Content -LiteralPath (Join-Path $wwwAsset "version.json") -Value $versionJson -Encoding UTF8
+    [System.IO.File]::WriteAllText((Join-Path $wwwAsset "version.json"), $versionJson, $utf8NoBom)
 }
 
 $wwwZipPath = Join-Path $outDir "exgame-$Version-www.zip"

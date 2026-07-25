@@ -25,17 +25,21 @@ import java.util.zip.ZipInputStream;
 /**
  * GitHub Releases의 version.json / www zip을 확인해
  * 내부 저장소에 게임 본문을 갱신합니다.
+ * <p>
+ * PAT/토큰 없이 공개 Releases URL만 사용합니다.
  */
 public final class GameUpdateManager {
     private static final String TAG = "ExGameUpdate";
     private static final String PREFS = "exgame_update";
     private static final String KEY_WWW_VERSION = "www_version";
     private static final String KEY_WWW_VERSION_CODE = "www_version_code";
-    private static final int CONNECT_TIMEOUT_MS = 12_000;
-    private static final int READ_TIMEOUT_MS = 60_000;
+    private static final int CONNECT_TIMEOUT_MS = 8_000;
+    private static final int READ_TIMEOUT_MS = 20_000;
+    private static final int MAX_REDIRECTS = 8;
 
     public interface ProgressListener {
         void onStatus(String message);
+
         void onProgress(int percentOrMinusOne);
     }
 
@@ -74,7 +78,21 @@ public final class GameUpdateManager {
     }
 
     public boolean hasOtaWww() {
-        return new File(getOtaWwwDir(), "index.html").isFile();
+        File index = new File(getOtaWwwDir(), "index.html");
+        if (!index.isFile()) return false;
+        // 깨진 OTA(빈 껍데기)면 내장 assets 로 폴백
+        File indexJs = new File(getOtaWwwDir(), "index.js");
+        File srcDir = new File(getOtaWwwDir(), "src");
+        return indexJs.isFile() || srcDir.isDirectory();
+    }
+
+    /** 손상된 OTA를 지워 다음 실행에서 APK 내장본을 쓰게 합니다. */
+    public void discardBrokenOtaIfNeeded() {
+        if (new File(getOtaWwwDir(), "index.html").isFile() && !hasOtaWww()) {
+            Log.w(TAG, "discarding broken OTA");
+            deleteRecursive(getOtaRootDir());
+            prefs().edit().remove(KEY_WWW_VERSION).remove(KEY_WWW_VERSION_CODE).apply();
+        }
     }
 
     public String getInstalledWwwVersion() {
@@ -86,11 +104,12 @@ public final class GameUpdateManager {
     }
 
     /**
-     * 최신 릴리스를 확인하고 필요 시 www zip을 받아 적용합니다.
-     * 네트워크 실패 시 내장/기존 OTA로 계속 진행합니다.
+     * 최신 릴리스를 확인하고, remote 가 더 높을 때만 www zip을 받아 적용합니다.
+     * 네트워크/파싱 실패 시 내장·기존 OTA로 계속합니다. PAT 불필요.
      */
     public Result checkAndApply(ProgressListener listener) {
         notify(listener, "업데이트 확인 중…", -1);
+        discardBrokenOtaIfNeeded();
         try {
             JSONObject remote = fetchVersionJson();
             if (remote == null) {
@@ -100,26 +119,24 @@ public final class GameUpdateManager {
             String remoteVersion = remote.optString("version", "");
             int remoteCode = remote.optInt("versionCode", 0);
             String wwwZip = remote.optString("wwwZip", "");
-            if (wwwZip.isEmpty()) {
+            if (wwwZip.isEmpty() && remoteVersion.length() > 0) {
                 wwwZip = String.format(Locale.US, "exgame-%s-www.zip", remoteVersion);
             }
 
             int localCode = getInstalledWwwVersionCode();
-            boolean needWww = remoteCode > localCode
-                    || (remoteCode == localCode && !hasOtaWww() && remoteCode > 0);
-            // 버전 문자열만 올라간 경우도 허용
-            if (!needWww && remoteCode == localCode) {
-                String localVer = getInstalledWwwVersion();
-                needWww = remoteVersion.length() > 0
-                        && !remoteVersion.equals(localVer)
-                        && compareSemver(remoteVersion, localVer) > 0;
+            String localVer = getInstalledWwwVersion();
+
+            // 같은 버전(또는 더 낮음)이면 절대 재다운로드하지 않음 — 이전엔 !hasOtaWww 때 23MB를 다시 받아 멈춘 것처럼 보였음
+            boolean newer = remoteCode > localCode
+                    || (remoteCode == localCode
+                    && remoteVersion.length() > 0
+                    && compareSemver(remoteVersion, localVer) > 0);
+            if (!newer) {
+                return new Result(false, localVer, localCode,
+                        hasOtaWww() ? "이미 최신입니다" : "내장 버전 사용");
             }
-            if (!needWww && hasOtaWww()) {
-                return new Result(false, getInstalledWwwVersion(), localCode, "이미 최신입니다");
-            }
-            if (!needWww && !hasOtaWww() && remoteCode <= bundledVersionCode()) {
-                return new Result(false, bundledVersionName(), bundledVersionCode(),
-                        "내장 버전 사용");
+            if (wwwZip.isEmpty()) {
+                return new Result(false, localVer, localCode, "wwwZip 필드 없음");
             }
 
             notify(listener, "게임 데이터 다운로드 중…", 0);
@@ -138,7 +155,6 @@ public final class GameUpdateManager {
                 throw new IOException("staging 디렉터리 생성 실패");
             }
             unzipTo(zipFile, staging);
-            // zip 루트가 www/ 이거나 바로 index.html 인 경우 모두 허용
             File stagedWww = new File(staging, "www");
             if (!new File(stagedWww, "index.html").isFile()) {
                 if (new File(staging, "index.html").isFile()) {
@@ -149,14 +165,10 @@ public final class GameUpdateManager {
             }
 
             File otaRoot = getOtaRootDir();
-            File otaWww = getOtaWwwDir();
-            deleteRecursive(otaWww);
-            // ota/www 로 이동
-            File finalWwwParent = otaRoot;
-            if (!finalWwwParent.exists() && !finalWwwParent.mkdirs()) {
+            if (!otaRoot.exists() && !otaRoot.mkdirs()) {
                 throw new IOException("ota 루트 생성 실패");
             }
-            File targetWww = new File(finalWwwParent, "www");
+            File targetWww = new File(otaRoot, "www");
             deleteRecursive(targetWww);
             if (stagedWww.equals(staging)) {
                 if (!stagedWww.renameTo(targetWww)) {
@@ -171,18 +183,23 @@ public final class GameUpdateManager {
                     deleteRecursive(staging);
                 }
             }
-            // rename left empty staging
             deleteRecursive(staging);
             //noinspection ResultOfMethodCallIgnored
             zipFile.delete();
 
+            if (!hasOtaWww()) {
+                deleteRecursive(getOtaRootDir());
+                throw new IOException("OTA 검증 실패(필수 파일 없음)");
+            }
+
+            int appliedCode = Math.max(remoteCode, 1);
             prefs().edit()
                     .putString(KEY_WWW_VERSION, remoteVersion)
-                    .putInt(KEY_WWW_VERSION_CODE, Math.max(remoteCode, 1))
+                    .putInt(KEY_WWW_VERSION_CODE, appliedCode)
                     .apply();
 
-            writeLocalVersionMarker(remoteVersion, Math.max(remoteCode, 1));
-            return new Result(true, remoteVersion, Math.max(remoteCode, 1), "업데이트 완료");
+            writeLocalVersionMarker(remoteVersion, appliedCode);
+            return new Result(true, remoteVersion, appliedCode, "업데이트 완료");
         } catch (Exception e) {
             Log.w(TAG, "update failed", e);
             return new Result(false, getInstalledWwwVersion(), getInstalledWwwVersionCode(),
@@ -190,31 +207,30 @@ public final class GameUpdateManager {
         }
     }
 
-    private JSONObject fetchVersionJson() throws IOException {
+    private JSONObject fetchVersionJson() {
         String url = String.format(
                 Locale.US,
                 "https://github.com/%s/%s/releases/latest/download/version.json",
                 owner, repo
         );
-        HttpURLConnection conn = open(url);
         try {
-            int code = conn.getResponseCode();
-            if (code >= 400) {
-                Log.w(TAG, "version.json HTTP " + code);
-                return null;
+            byte[] raw = downloadBytes(url, null);
+            String body = new String(raw, StandardCharsets.UTF_8);
+            // PowerShell Set-Content -Encoding UTF8 이 붙인 BOM 제거
+            if (!body.isEmpty() && body.charAt(0) == '\uFEFF') {
+                body = body.substring(1);
             }
-            String body = readFully(conn.getInputStream());
+            body = body.trim();
+            if (body.isEmpty()) return null;
             return new JSONObject(body);
         } catch (Exception e) {
             Log.w(TAG, "fetchVersionJson", e);
             return null;
-        } finally {
-            conn.disconnect();
         }
     }
 
     private void downloadFile(String url, File dest, ProgressListener listener) throws IOException {
-        HttpURLConnection conn = open(url);
+        HttpURLConnection conn = openFollowingRedirects(url);
         try {
             int code = conn.getResponseCode();
             if (code >= 400) {
@@ -246,25 +262,64 @@ public final class GameUpdateManager {
         }
     }
 
+    private byte[] downloadBytes(String url, ProgressListener listener) throws IOException {
+        HttpURLConnection conn = openFollowingRedirects(url);
+        try {
+            int code = conn.getResponseCode();
+            if (code >= 400) {
+                throw new IOException("HTTP " + code);
+            }
+            try (InputStream in = new BufferedInputStream(conn.getInputStream())) {
+                return readFullyBytes(in);
+            }
+        } finally {
+            conn.disconnect();
+        }
+    }
+
+    /**
+     * GitHub → objects.githubusercontent.com 리다이렉트를 홉마다 타임아웃을 유지하며 따라갑니다.
+     * (자동 follow 시 일부 기기에서 타임아웃이 무시되어 멈출 수 있음)
+     */
+    private static HttpURLConnection openFollowingRedirects(String urlString) throws IOException {
+        String current = urlString;
+        for (int i = 0; i < MAX_REDIRECTS; i++) {
+            HttpURLConnection conn = open(current);
+            conn.setInstanceFollowRedirects(false);
+            int code = conn.getResponseCode();
+            if (code >= 300 && code < 400) {
+                String location = conn.getHeaderField("Location");
+                conn.disconnect();
+                if (location == null || location.isEmpty()) {
+                    throw new IOException("리다이렉트 Location 없음");
+                }
+                current = new URL(new URL(current), location).toString();
+                continue;
+            }
+            return conn;
+        }
+        throw new IOException("리다이렉트 초과");
+    }
+
     private static HttpURLConnection open(String urlString) throws IOException {
         URL url = new URL(urlString);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setInstanceFollowRedirects(true);
         conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
         conn.setReadTimeout(READ_TIMEOUT_MS);
         conn.setRequestProperty("Accept", "application/octet-stream, application/json, */*");
+        // GitHub 공개 API/다운로드 — PAT 없음. User-Agent 만 명시.
         conn.setRequestProperty("User-Agent", "ExGame-Android-Updater");
         return conn;
     }
 
-    private static String readFully(InputStream in) throws IOException {
+    private static byte[] readFullyBytes(InputStream in) throws IOException {
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         byte[] buf = new byte[4096];
         int n;
         while ((n = in.read(buf)) >= 0) {
             bos.write(buf, 0, n);
         }
-        return bos.toString(StandardCharsets.UTF_8.name());
+        return bos.toByteArray();
     }
 
     private void unzipTo(File zipFile, File destDir) throws IOException {
@@ -273,11 +328,16 @@ public final class GameUpdateManager {
             ZipEntry entry;
             byte[] buf = new byte[8192];
             while ((entry = zis.getNextEntry()) != null) {
-                File out = new File(destDir, entry.getName());
+                String name = entry.getName();
+                // Windows Compress-Archive 가 가끔 쓰는 절대경로/.. 방어
+                if (name.contains("..")) {
+                    throw new IOException("잘못된 zip 경로: " + name);
+                }
+                File out = new File(destDir, name);
                 String destPath = destDir.getCanonicalPath();
                 String outPath = out.getCanonicalPath();
                 if (!outPath.startsWith(destPath + File.separator) && !outPath.equals(destPath)) {
-                    throw new IOException("잘못된 zip 경로: " + entry.getName());
+                    throw new IOException("잘못된 zip 경로: " + name);
                 }
                 if (entry.isDirectory()) {
                     if (!out.exists() && !out.mkdirs()) {

@@ -5,6 +5,7 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -24,16 +25,23 @@ import androidx.webkit.WebViewAssetLoader;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Cocos Web 빌드를 로컬 https 가상 호스트로 띄웁니다.
- * 시작 시 GitHub Releases version.json을 확인해 www를 OTA 갱신합니다.
+ * 시작 시 공개 GitHub Releases를 확인합니다(PAT 불필요).
+ * 업데이트 확인이 늦어도 내장 버전으로 먼저 진입합니다.
  */
 public class MainActivity extends AppCompatActivity {
+    private static final String TAG = "ExGameMain";
     private static final String GAME_URL =
             "https://appassets.androidplatform.net/assets/www/index.html"
                     + "?offline=1&fullscreen=1&mobile=1";
+    /** 업데이트 확인 최대 대기. 넘으면 내장 버전으로 바로 시작. */
+    private static final long UPDATE_BUDGET_MS = 12_000L;
 
     private WebView webView;
     private LinearLayout statusPanel;
@@ -42,6 +50,8 @@ public class MainActivity extends AppCompatActivity {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final AtomicReference<WebViewAssetLoader> assetLoaderRef = new AtomicReference<>();
+    private final AtomicBoolean gameStarted = new AtomicBoolean(false);
+    private GameUpdateManager updater;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -49,9 +59,11 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.parseColor("#101820"));
         setContentView(root);
 
         webView = new WebView(this);
+        webView.setBackgroundColor(Color.parseColor("#101820"));
         root.addView(webView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
@@ -63,7 +75,15 @@ public class MainActivity extends AppCompatActivity {
                 FrameLayout.LayoutParams.MATCH_PARENT
         ));
 
+        updater = new GameUpdateManager(
+                this,
+                getString(R.string.github_owner),
+                getString(R.string.github_repo)
+        );
+        updater.discardBrokenOtaIfNeeded();
         configureWebView();
+        // 일단 내장/기존 OTA 로더를 깔아 두고, 타임아웃 시 바로 게임 진입 가능
+        installAssetLoader(updater);
         startUpdateThenLoad();
     }
 
@@ -71,7 +91,7 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setGravity(Gravity.CENTER);
-        panel.setBackgroundColor(Color.parseColor("#E0101820"));
+        panel.setBackgroundColor(Color.parseColor("#F0101820"));
         panel.setPadding(48, 48, 48, 48);
 
         statusText = new TextView(this);
@@ -119,16 +139,14 @@ public class MainActivity extends AppCompatActivity {
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
     }
 
-    /**
-     * OTA www가 있으면 내부 저장소만 사용하고, 없으면 APK assets를 사용합니다.
-     * (InternalStoragePathHandler는 파일 부재 시 404를 돌려 폴백 체인이 불가합니다.)
-     */
-    private void installAssetLoader(GameUpdateManager updater) {
+    private void installAssetLoader(GameUpdateManager updateManager) {
         WebViewAssetLoader.Builder builder = new WebViewAssetLoader.Builder();
-        if (updater.hasOtaWww()) {
+        if (updateManager.hasOtaWww()) {
             builder.addPathHandler(
                     "/assets/",
-                    new WebViewAssetLoader.InternalStoragePathHandler(this, updater.getOtaRootDir())
+                    new WebViewAssetLoader.InternalStoragePathHandler(
+                            this, updateManager.getOtaRootDir()
+                    )
             );
         } else {
             builder.addPathHandler(
@@ -140,50 +158,75 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startUpdateThenLoad() {
-        final GameUpdateManager updater = new GameUpdateManager(
-                this,
-                getString(R.string.github_owner),
-                getString(R.string.github_repo)
-        );
+        Future<GameUpdateManager.Result> future = worker.submit(() -> updater.checkAndApply(
+                new GameUpdateManager.ProgressListener() {
+                    @Override
+                    public void onStatus(String message) {
+                        mainHandler.post(() -> {
+                            if (!gameStarted.get()) statusText.setText(message);
+                        });
+                    }
+
+                    @Override
+                    public void onProgress(int percentOrMinusOne) {
+                        mainHandler.post(() -> {
+                            if (gameStarted.get()) return;
+                            if (percentOrMinusOne < 0) {
+                                progressBar.setIndeterminate(true);
+                            } else {
+                                progressBar.setIndeterminate(false);
+                                progressBar.setProgress(percentOrMinusOne);
+                            }
+                        });
+                    }
+                }
+        ));
 
         worker.execute(() -> {
-            GameUpdateManager.Result result = updater.checkAndApply(
-                    new GameUpdateManager.ProgressListener() {
-                        @Override
-                        public void onStatus(String message) {
-                            mainHandler.post(() -> statusText.setText(message));
-                        }
+            GameUpdateManager.Result result;
+            try {
+                result = future.get(UPDATE_BUDGET_MS, TimeUnit.MILLISECONDS);
+            } catch (Exception e) {
+                Log.w(TAG, "update budget exceeded or failed", e);
+                future.cancel(true);
+                result = new GameUpdateManager.Result(
+                        false,
+                        updater.getInstalledWwwVersion(),
+                        updater.getInstalledWwwVersionCode(),
+                        "업데이트 시간 초과 — 내장 버전으로 시작"
+                );
+            }
 
-                        @Override
-                        public void onProgress(int percentOrMinusOne) {
-                            mainHandler.post(() -> {
-                                if (percentOrMinusOne < 0) {
-                                    progressBar.setIndeterminate(true);
-                                } else {
-                                    progressBar.setIndeterminate(false);
-                                    progressBar.setProgress(percentOrMinusOne);
-                                }
-                            });
-                        }
-                    }
-            );
-
+            final GameUpdateManager.Result finalResult = result;
             mainHandler.post(() -> {
-                installAssetLoader(updater);
-                if (result.updated) {
+                if (finalResult.updated) {
+                    installAssetLoader(updater);
                     statusText.setText(
-                            getString(R.string.update_ready) + " (" + result.version + ")"
+                            getString(R.string.update_ready) + " (" + finalResult.version + ")"
                     );
-                } else if (result.message != null && result.message.contains("원격")) {
+                } else if (finalResult.message != null
+                        && (finalResult.message.contains("원격")
+                        || finalResult.message.contains("초과"))) {
                     statusText.setText(R.string.update_failed_offline);
                 }
-                long delayMs = result.updated ? 600L : 200L;
-                mainHandler.postDelayed(() -> {
-                    statusPanel.setVisibility(View.GONE);
-                    webView.loadUrl(GAME_URL);
-                }, delayMs);
+                startGameOnce();
             });
         });
+
+        // 예산이 끝나기 전에도 UI가 하얗게만 보이지 않도록, 로더가 준비되면 안전망 타이머
+        mainHandler.postDelayed(() -> {
+            if (!gameStarted.get()) {
+                statusText.setText(R.string.update_failed_offline);
+                startGameOnce();
+            }
+        }, UPDATE_BUDGET_MS + 500L);
+    }
+
+    private void startGameOnce() {
+        if (!gameStarted.compareAndSet(false, true)) return;
+        installAssetLoader(updater);
+        statusPanel.setVisibility(View.GONE);
+        webView.loadUrl(GAME_URL);
     }
 
     @Override

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.8 — 2026-07-26
+
+### 수정
+- 줌 후 클릭/터치 판정: canvasLocal÷World.scale 경로로 재수정 (휠·핀치 공통, PC/모바일 동일)
+
+## Unreleased
+
+### 변경
+- GitHub Releases: `exgame-*-www.zip` / APK / version.json 업로드 중단 → PC `exgame-*.zip`(bat)만 등록
+
 ## 0.1.7 — 2026-07-26
 
 ### 수정

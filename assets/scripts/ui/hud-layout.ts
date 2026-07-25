@@ -7,7 +7,6 @@ export const DESIGN_HEIGHT = 1440;
 
 const uiToScreenPos = new Vec3();
 const uiToWorldPos = new Vec3();
-const worldLocalPos = new Vec3();
 
 /**
  * getUILocation(가시 영역) → 디자인 좌표(2560×1440)로 변환합니다.
@@ -70,10 +69,12 @@ export function uiLocationToCanvasLocal(
 /**
  * getUILocation → World 노드 로컬 픽셀(청크·NPC·자원 히트박스와 동일 공간).
  *
- * 1) UI → 스크린 → Camera.screenToWorld (뷰포트·카메라 위치 반영)
- * 2) World.inverseTransformPoint (핀치 줌용 World.scale 역변환)
- *
+ * 줌 1.0에서 검증된 `uiLocationToCanvasLocal`(캔버스 상대)을 기준으로,
+ * World.setScale(핀치/휠 공통)만 역으로 나눠 월드 로컬을 구합니다.
  * hitbox 자체는 확대/축소하지 않습니다. HUD는 normalizeUiToDesign 을 유지하세요.
+ *
+ * 참고: Camera.screenToWorld + inverseTransformPoint 는 AlignCanvas 환경에서
+ * 캔버스 상대 히트 공간과 어긋날 수 있어 사용하지 않습니다.
  */
 export function uiLocationToWorldLocal(
   uiX: number,
@@ -81,31 +82,13 @@ export function uiLocationToWorldLocal(
   cameraNode: Node,
   worldNode: Node,
 ): { x: number; y: number } {
-  const camera = cameraNode.getComponent(Camera);
-  const visible = view.getVisibleSize();
-  const origin = view.getVisibleOrigin();
-  if (!camera) {
-    const approxX = cameraNode.position.x + (uiX - origin.x) - visible.width / 2;
-    const approxY = cameraNode.position.y + (uiY - origin.y) - visible.height / 2;
-    const scaleX = worldNode.scale.x || 1;
-    const scaleY = worldNode.scale.y || 1;
-    return {
-      x: (approxX - worldNode.position.x) / scaleX,
-      y: (approxY - worldNode.position.y) / scaleY,
-    };
-  }
-
-  const viewport = view.getViewportRect();
-  const scaleX = view.getScaleX() || 1;
-  const scaleY = view.getScaleY() || 1;
-  uiToScreenPos.set(
-    (uiX - origin.x) * scaleX + viewport.x,
-    (uiY - origin.y) * scaleY + viewport.y,
-    0,
-  );
-  camera.screenToWorld(uiToScreenPos, uiToWorldPos);
-  worldNode.inverseTransformPoint(worldLocalPos, uiToWorldPos);
-  return { x: worldLocalPos.x, y: worldLocalPos.y };
+  const canvasLocal = uiLocationToCanvasLocal(uiX, uiY, cameraNode);
+  const scaleX = Math.abs(worldNode.scale.x) > 1e-6 ? worldNode.scale.x : 1;
+  const scaleY = Math.abs(worldNode.scale.y) > 1e-6 ? worldNode.scale.y : 1;
+  return {
+    x: (canvasLocal.x - worldNode.position.x) / scaleX,
+    y: (canvasLocal.y - worldNode.position.y) / scaleY,
+  };
 }
 
 export const HOTBAR_SLOT_SIZE = 84;

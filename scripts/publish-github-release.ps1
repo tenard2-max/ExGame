@@ -1,6 +1,7 @@
 ﻿<#
 .SYNOPSIS
-  GitHub Releases용 version.json + www zip을 만들고, (선택) gh로 업로드합니다.
+  PC 오프라인 ZIP(bat)을 만들고 GitHub Releases에 업로드합니다.
+  www.zip / OTA 패키지는 만들지 않습니다.
 
 .EXAMPLE
   .\scripts\publish-github-release.ps1
@@ -73,8 +74,7 @@ if (-not $SkipWebBuild) {
 $versionObj = [ordered]@{
     version     = $Version
     versionCode = $versionCode
-    wwwZip      = "exgame-$Version-www.zip"
-    apk         = "exgame-$Version-android-debug.apk"
+    pcZip       = "exgame-$Version.zip"
     publishedAt = (Get-Date).ToUniversalTime().ToString("o")
 }
 $versionJson = ($versionObj | ConvertTo-Json -Compress)
@@ -83,30 +83,27 @@ $versionJsonPath = Join-Path $outDir "version.json"
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText($versionJsonPath, $versionJson, $utf8NoBom)
 [System.IO.File]::WriteAllText((Join-Path $webDesktop "version.json"), $versionJson, $utf8NoBom)
-Write-Host "Wrote version.json ($Version / $versionCode)"
+Write-Host "Wrote version.json ($Version / $versionCode) — GitHub에는 PC ZIP만 업로드"
 
-Write-Host '[publish] PC ZIP + Android www + APK...'
-& (Join-Path $PSScriptRoot "package-all.ps1") -Version $Version -SkipWebBuild
+Write-Host '[publish] PC ZIP (bat) 패키징...'
+& (Join-Path $PSScriptRoot "package-release.ps1") -Version $Version
 
-$wwwAsset = Join-Path $projectPath "mobile\android\app\src\main\assets\www"
-if (Test-Path -LiteralPath $wwwAsset) {
-    [System.IO.File]::WriteAllText((Join-Path $wwwAsset "version.json"), $versionJson, $utf8NoBom)
+# 이전 릴리스용 www.zip이 남아 있으면 삭제 (업로드하지 않음)
+$legacyWwwZip = Join-Path $outDir "exgame-$Version-www.zip"
+if (Test-Path -LiteralPath $legacyWwwZip) {
+    Remove-Item -LiteralPath $legacyWwwZip -Force
+    Write-Host "Removed legacy $legacyWwwZip"
 }
 
-$wwwZipPath = Join-Path $outDir "exgame-$Version-www.zip"
-if (Test-Path -LiteralPath $wwwZipPath) { Remove-Item -LiteralPath $wwwZipPath -Force }
-Compress-Archive -Path (Join-Path $webDesktop "*") -DestinationPath $wwwZipPath -CompressionLevel Optimal
-Write-Host "Wrote $wwwZipPath"
-
 $pcZip = Join-Path $outDir "exgame-$Version.zip"
-$apkPath = Join-Path $outDir "exgame-$Version-android-debug.apk"
+if (-not (Test-Path -LiteralPath $pcZip)) {
+    throw "PC ZIP missing: $pcZip"
+}
 
 if ($SkipUpload) {
     Write-Host "SkipUpload: local artifacts only."
-    Write-Host "  $versionJsonPath"
-    Write-Host "  $wwwZipPath"
-    if (Test-Path $pcZip) { Write-Host "  $pcZip" }
-    if (Test-Path $apkPath) { Write-Host "  $apkPath" }
+    Write-Host "  $pcZip"
+    Write-Host "  $versionJsonPath (local only, not uploaded)"
     exit 0
 }
 
@@ -120,10 +117,7 @@ if (Test-Path -LiteralPath $localGh) {
 if (-not $ghCmd) {
     Write-Warning "gh CLI missing. Install tools/gh or add gh to PATH."
     Write-Host "Manual upload files:"
-    Write-Host "  $versionJsonPath"
-    Write-Host "  $wwwZipPath"
-    if (Test-Path $pcZip) { Write-Host "  $pcZip" }
-    if (Test-Path $apkPath) { Write-Host "  $apkPath" }
+    Write-Host "  $pcZip"
     Write-Host "Tag: v$Version"
     exit 0
 }
@@ -133,12 +127,12 @@ if (-not $Notes) {
     $Notes = @"
 ## ExGame v$Version
 
-- Phone: checks GitHub Releases version.json / www zip and updates automatically.
-- PC: unzip exgame-$Version.zip then run auto-run.bat
+### PC
+1. ``exgame-$Version.zip`` 다운로드 후 압축 해제
+2. ``auto-run.bat`` 실행 (Python 필요)
+3. ``index.html`` 더블클릭은 지원하지 않습니다 (하얀 화면)
 
-### Android OTA
-If the app is already installed, game data updates without reinstalling.
-Reinstall the APK only when the native shell changes.
+Android APK / www OTA zip은 Releases에 올리지 않습니다.
 "@
 }
 
@@ -163,9 +157,8 @@ $ErrorActionPreference = "Continue"
 & $ghCmd release view $tag --repo "$Owner/$Repo" 2>$null | Out-Null
 $releaseExists = ($LASTEXITCODE -eq 0)
 $ErrorActionPreference = $prevEap
-$assets = @($versionJsonPath, $wwwZipPath)
-if (Test-Path -LiteralPath $pcZip) { $assets += $pcZip }
-if (Test-Path -LiteralPath $apkPath) { $assets += $apkPath }
+# GitHub Releases: PC bat 패키지(ZIP)만 등록
+$assets = @($pcZip)
 
 $ErrorActionPreference = "Continue"
 try {

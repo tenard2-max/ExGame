@@ -56,28 +56,20 @@ Android Studio:
 
 PC 세이브와 폰 세이브는 **기기가 달라 IndexedDB가 공유되지 않습니다.**
 
-## 업데이트 흐름 (GitHub 자동)
+## 업데이트 흐름
 
-폰 앱은 실행 시 `GitHub Releases`의 `version.json`을 확인하고,
-더 새 버전이면 `exgame-*-www.zip`을 받아 내부 저장소에 적용합니다.
-(셸/네이티브 코드가 바뀐 경우에만 APK를 다시 설치합니다.)
+GitHub Releases에는 **PC ZIP(`auto-run.bat`)만** 올립니다.  
+`www.zip` OTA / Releases용 APK는 사용하지 않습니다. 폰은 APK에 내장된 `assets/www`로 실행합니다.
 
 ```powershell
 cd game
-# 버전은 package.json 기준. Releases 업로드까지:
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish-github-release.ps1
+# APK만 로컬 빌드 (GitHub 업로드 안 함)
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-all.ps1
+# 또는
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-apk.ps1
 ```
 
-릴리스에 포함되는 파일:
-
-| 파일 | 용도 |
-|------|------|
-| `version.json` | 폰 버전 체크 |
-| `exgame-x.y.z-www.zip` | 폰 OTA 게임 데이터 |
-| `exgame-x.y.z.zip` | PC 오프라인 |
-| `exgame-x.y.z-android-*.apk` | 최초 설치·셸 업데이트 |
-
-저장소 owner/repo는 `mobile/android/app/src/main/res/values/update_config.xml` 과 일치해야 합니다.
+저장소 owner/repo는 `mobile/android/app/src/main/res/values/update_config.xml` 참고 (레거시 OTA 설정).
 
 ## 문제 해결
 

@@ -9,23 +9,27 @@
 
 ```powershell
 cd game
-# 권장: 빌드 + version.json/www zip + GitHub Releases 업로드
+# 권장: Web 빌드 + PC ZIP → GitHub Releases 업로드 (PC bat 패키지만)
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish-github-release.ps1
 
 # 업로드만 생략 (로컬 산출물)
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\publish-github-release.ps1 -SkipUpload
 ```
 
-산출물 (`release/`):
+GitHub Releases에 올리는 파일:
 
 | 파일 | 대상 |
 |------|------|
-| `version.json` | 폰 자동 업데이트 체크 |
-| `exgame-*-www.zip` | 폰 OTA |
-| `exgame-*.zip` | PC 오프라인 |
-| `exgame-*-android-debug.apk` | 안드로이드 최초 설치 |
+| `exgame-*.zip` | PC 오프라인 (`auto-run.bat`) |
 
-APK가 안 나왔다면 Android Studio로 `mobile/android`를 연 뒤 APK를 빌드하세요. → [`MOBILE.md`](./MOBILE.md)
+로컬에만 생성 (Releases 미업로드):
+
+| 파일 | 대상 |
+|------|------|
+| `version.json` | 로컬 메타 |
+| `exgame-*-android-debug.apk` | `package-all.ps1` / `build-apk.ps1` 로 별도 빌드 |
+
+`exgame-*-www.zip` OTA 패키지는 **만들지 않으며** Releases에도 올리지 않습니다. 폰은 APK에 포함된 assets로 실행합니다. → [`MOBILE.md`](./MOBILE.md)
 
 ## Releases에 올릴 내용
 
@@ -41,23 +45,12 @@ Seed 기반 무한 월드 MVP. 다운로드 후 인터넷 없이 플레이·저�
 ### PC
 1. `exgame-0.1.0.zip` 다운로드 → 압축 해제
 2. `auto-run.bat` 실행 (Python 필요)
-3. 브라우저에서 플레이
-
-### Android
-1. `exgame-*-android-*.apk` 다운로드
-2. 설치 허용 후 ExGame 실행 (가로 화면)
-3. PC와 세이브는 공유되지 않습니다
-
-### 문서
-- OFFLINE.md (PC)
-- MOBILE.md (Android)
+3. `index.html` 더블클릭은 지원하지 않음
 ```
 
 첨부:
 
-- `exgame-0.1.0.zip` (필수)
-- `exgame-0.1.0-android-*.apk` (권장)
-- 필요 시 CHANGELOG
+- `exgame-0.1.0.zip` (필수, bat 포함 PC 패키지만)
 
 ## NovelExplor 연결
 
@@ -66,7 +59,7 @@ NovelExplor **게임하기** → `docs/게임하기_소개.html`
 
 ## 공개 전 검증
 
-- [ ] 다른 PC에서 ZIP만으로 실행된다
+- [ ] 다른 PC에서 ZIP만으로 실행된다 (`auto-run.bat`)
 - [ ] 비행기 모드에서 로드·플레이·저장된다
-- [ ] 폰에 APK 설치 후 가로 화면으로 플레이된다
-- [ ] 버전 문자열이 package.json · ZIP · APK · 태그와 일치한다
+- [ ] 버전 문자열이 package.json · ZIP · 태그와 일치한다
+- [ ] Releases에 www.zip / APK가 올라가지 않는다

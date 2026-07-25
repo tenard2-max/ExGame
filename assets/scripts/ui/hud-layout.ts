@@ -1,4 +1,4 @@
-import { Camera, Node, Vec3, view } from 'cc';
+import { Camera, Node, UITransform, Vec3, view } from 'cc';
 
 /** 디자인 해상도(2560×1440) UI 좌표계 기준 HUD 배치 상수입니다. */
 
@@ -7,6 +7,8 @@ export const DESIGN_HEIGHT = 1440;
 
 const uiToScreenPos = new Vec3();
 const uiToWorldPos = new Vec3();
+const canvasArPos = new Vec3();
+const worldLocalPos = new Vec3();
 
 /**
  * getUILocation(가시 영역) → 디자인 좌표(2560×1440)로 변환합니다.
@@ -69,12 +71,11 @@ export function uiLocationToCanvasLocal(
 /**
  * getUILocation → World 노드 로컬 픽셀(청크·NPC·자원 히트박스와 동일 공간).
  *
- * 줌 1.0에서 검증된 `uiLocationToCanvasLocal`(캔버스 상대)을 기준으로,
- * World.setScale(핀치/휠 공통)만 역으로 나눠 월드 로컬을 구합니다.
- * hitbox 자체는 확대/축소하지 않습니다. HUD는 normalizeUiToDesign 을 유지하세요.
+ * - 줌 ≈ 1.0: 기존에 검증된 `uiLocationToCanvasLocal` 그대로 (클릭 복구).
+ * - 줌 ≠ 1.0: CameraFollow와 동일한 Canvas AR 공간으로 올린 뒤 World.scale로 나눔.
+ *   (canvas.worldPosition 단순 차감 값을 scale로 나누면 AlignCanvas에서 어긋남)
  *
- * 참고: Camera.screenToWorld + inverseTransformPoint 는 AlignCanvas 환경에서
- * 캔버스 상대 히트 공간과 어긋날 수 있어 사용하지 않습니다.
+ * hitbox 자체는 확대/축소하지 않습니다. HUD는 normalizeUiToDesign 을 유지하세요.
  */
 export function uiLocationToWorldLocal(
   uiX: number,
@@ -82,12 +83,45 @@ export function uiLocationToWorldLocal(
   cameraNode: Node,
   worldNode: Node,
 ): { x: number; y: number } {
-  const canvasLocal = uiLocationToCanvasLocal(uiX, uiY, cameraNode);
-  const scaleX = Math.abs(worldNode.scale.x) > 1e-6 ? worldNode.scale.x : 1;
-  const scaleY = Math.abs(worldNode.scale.y) > 1e-6 ? worldNode.scale.y : 1;
+  const scaleX = worldNode.scale.x;
+  const scaleY = worldNode.scale.y;
+  const unzoomed = Math.abs(scaleX - 1) < 1e-3 && Math.abs(scaleY - 1) < 1e-3;
+  if (unzoomed) {
+    return uiLocationToCanvasLocal(uiX, uiY, cameraNode);
+  }
+
+  const camera = cameraNode.getComponent(Camera);
+  const canvas = cameraNode.parent;
+  const canvasUi = canvas?.getComponent(UITransform);
+  if (!camera || !canvasUi) {
+    return uiLocationToCanvasLocal(uiX, uiY, cameraNode);
+  }
+
+  const origin = view.getVisibleOrigin();
+  const viewport = view.getViewportRect();
+  const viewScaleX = view.getScaleX() || 1;
+  const viewScaleY = view.getScaleY() || 1;
+  uiToScreenPos.set(
+    (uiX - origin.x) * viewScaleX + viewport.x,
+    (uiY - origin.y) * viewScaleY + viewport.y,
+    0,
+  );
+  camera.screenToWorld(uiToScreenPos, uiToWorldPos);
+  // CameraFollow 가 쓰는 것과 동일: Canvas AR 로컬
+  canvasUi.convertToNodeSpaceAR(uiToWorldPos, canvasArPos);
+
+  const worldUi = worldNode.getComponent(UITransform);
+  if (worldUi) {
+    canvasUi.convertToWorldSpaceAR(canvasArPos, uiToWorldPos);
+    worldUi.convertToNodeSpaceAR(uiToWorldPos, worldLocalPos);
+    return { x: worldLocalPos.x, y: worldLocalPos.y };
+  }
+
+  const safeX = Math.abs(scaleX) > 1e-6 ? scaleX : 1;
+  const safeY = Math.abs(scaleY) > 1e-6 ? scaleY : 1;
   return {
-    x: (canvasLocal.x - worldNode.position.x) / scaleX,
-    y: (canvasLocal.y - worldNode.position.y) / scaleY,
+    x: (canvasArPos.x - worldNode.position.x) / safeX,
+    y: (canvasArPos.y - worldNode.position.y) / safeY,
   };
 }
 

@@ -22,6 +22,8 @@ const MIN_ZOOM = 0.55;
 const MAX_ZOOM = 2.75;
 const WHEEL_STEP = 0.12;
 const STORAGE_KEY = 'exgame.worldZoom';
+/** 0.1.8 잘못된 히트 변환으로 저장된 줌을 1회 초기화합니다. */
+const STORAGE_RESET_FLAG = 'exgame.worldZoom.reset019';
 
 @ccclass('WorldPinchZoom')
 export class WorldPinchZoom extends Component {
@@ -132,6 +134,12 @@ export class WorldPinchZoom extends Component {
   private loadZoom(): number {
     try {
       if (typeof localStorage === 'undefined') return 1;
+      // 0.1.8에서 줌≠1 이면 클릭이 전부 실패할 수 있어 1회 리셋합니다.
+      if (!localStorage.getItem(STORAGE_RESET_FLAG)) {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.setItem(STORAGE_RESET_FLAG, '1');
+        return 1;
+      }
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return 1;
       const value = Number(raw);

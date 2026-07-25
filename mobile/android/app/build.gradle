@@ -10,8 +10,8 @@ android {
         applicationId "com.exgame.app"
         minSdk 24
         targetSdk 34
-        versionCode 108
-        versionName "0.1.8"
+        versionCode 109
+        versionName "0.1.9"
     }
 
     buildTypes {
@@ -34,4 +34,5 @@ dependencies {
     implementation "androidx.appcompat:appcompat:1.6.1"
     implementation "androidx.webkit:webkit:1.11.0"
 }
+
 

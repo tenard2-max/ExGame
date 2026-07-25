@@ -105,19 +105,54 @@ export function worldLocalToUiLocation(
 }
 
 /**
+ * World 로컬 AABB(중심·반폭)가 UI 클릭을 포함하는지 — 순방향 변환만 사용합니다.
+ */
+export function worldLocalAabbContainsUi(
+  uiX: number,
+  uiY: number,
+  centerLocalX: number,
+  centerLocalY: number,
+  halfW: number,
+  halfH: number,
+  cameraNode: Node,
+  worldNode: Node,
+  pad = 4,
+): boolean {
+  const corners = [
+    worldLocalToUiLocation(centerLocalX - halfW, centerLocalY - halfH, cameraNode, worldNode),
+    worldLocalToUiLocation(centerLocalX + halfW, centerLocalY - halfH, cameraNode, worldNode),
+    worldLocalToUiLocation(centerLocalX + halfW, centerLocalY + halfH, cameraNode, worldNode),
+    worldLocalToUiLocation(centerLocalX - halfW, centerLocalY + halfH, cameraNode, worldNode),
+  ];
+  let minX = corners[0].x;
+  let maxX = corners[0].x;
+  let minY = corners[0].y;
+  let maxY = corners[0].y;
+  for (let i = 1; i < corners.length; i += 1) {
+    minX = Math.min(minX, corners[i].x);
+    maxX = Math.max(maxX, corners[i].x);
+    minY = Math.min(minY, corners[i].y);
+    maxY = Math.max(maxY, corners[i].y);
+  }
+  return uiX >= minX - pad
+    && uiX <= maxX + pad
+    && uiY >= minY - pad
+    && uiY <= maxY + pad;
+}
+
+/**
  * getUILocation → World 노드 로컬 픽셀(청크·NPC·자원 히트박스와 동일 공간).
  *
  * 줌 ≈ 1: 검증된 `uiLocationToCanvasLocal`.
- * 줌 ≠ 1: World→UI 순방향(렌더와 동일)을 프로브로 측정한 아핀 역변환.
- *          screenToWorld 역경로만 쓰면 AlignCanvas + World.scale 에서 클릭이 빗나갑니다.
- * hitbox 숫자는 줌으로 키우지 않습니다.
+ * 줌 ≠ 1: 플레이어 근처에서 World→UI 2×2 매핑을 측정해 역변환.
+ *          (월드 원점 프로브는 카메라가 멀리 있으면 깨짐)
  */
 export function uiLocationToWorldLocal(
   uiX: number,
   uiY: number,
   cameraNode: Node,
   worldNode: Node,
-  _playerNode?: Node | null,
+  playerNode?: Node | null,
 ): { x: number; y: number } {
   const scaleX = worldNode.scale.x;
   const scaleY = worldNode.scale.y;
@@ -125,22 +160,30 @@ export function uiLocationToWorldLocal(
     return uiLocationToCanvasLocal(uiX, uiY, cameraNode);
   }
 
-  const PROBE = 4096;
-  const originUi = worldLocalToUiLocation(0, 0, cameraNode, worldNode);
-  const axisX = worldLocalToUiLocation(PROBE, 0, cameraNode, worldNode);
-  const axisY = worldLocalToUiLocation(0, PROBE, cameraNode, worldNode);
-  const effX = (axisX.x - originUi.x) / PROBE;
-  const effY = (axisY.y - originUi.y) / PROBE;
-  const safeX = Math.abs(effX) > 1e-6
-    ? effX
-    : (Math.abs(scaleX) > 1e-6 ? scaleX : 1);
-  const safeY = Math.abs(effY) > 1e-6
-    ? effY
-    : (Math.abs(scaleY) > 1e-6 ? scaleY : 1);
+  const anchorX = playerNode?.position.x ?? cameraNode.position.x / (scaleX || 1);
+  const anchorY = playerNode?.position.y ?? cameraNode.position.y / (scaleY || 1);
+  const probe = 256;
+  const originUi = worldLocalToUiLocation(anchorX, anchorY, cameraNode, worldNode);
+  const axisX = worldLocalToUiLocation(anchorX + probe, anchorY, cameraNode, worldNode);
+  const axisY = worldLocalToUiLocation(anchorX, anchorY + probe, cameraNode, worldNode);
 
+  const a = (axisX.x - originUi.x) / probe;
+  const c = (axisX.y - originUi.y) / probe;
+  const b = (axisY.x - originUi.x) / probe;
+  const d = (axisY.y - originUi.y) / probe;
+  const det = a * d - b * c;
+  if (Math.abs(det) < 1e-8) {
+    const safeX = Math.abs(scaleX) > 1e-6 ? scaleX : 1;
+    const safeY = Math.abs(scaleY) > 1e-6 ? scaleY : 1;
+    const canvasLocal = uiLocationToCanvasLocal(uiX, uiY, cameraNode);
+    return { x: canvasLocal.x / safeX, y: canvasLocal.y / safeY };
+  }
+
+  const dx = uiX - originUi.x;
+  const dy = uiY - originUi.y;
   return {
-    x: (uiX - originUi.x) / safeX,
-    y: (uiY - originUi.y) / safeY,
+    x: anchorX + (d * dx - b * dy) / det,
+    y: anchorY + (-c * dx + a * dy) / det,
   };
 }
 

@@ -845,69 +845,97 @@ export class BlockInteractionController extends Component {
     const banker = this.findBankerAtUi(uiLocation);
     if (banker) return banker.tile;
 
-    const pixel = this.toWorldPixel(uiLocation);
-    const harvestTile = this.chunkManager!.findHarvestableTileAtWorldPixel(
-      pixel.x,
-      pixel.y,
-      (blockId) => {
-        const definition = getBlockDefinition(blockId);
-        return definition.requiredHits !== null && !!definition.dropItemId;
-      },
-      (typeId) => (
-        getOreDefinition(typeId) !== null
-        || typeId === TREASURE_TYPE_ID
-        || typeId === DUNGEON_TYPE_ID
-        || typeId === NPC_TYPE_ID
-        || typeId === TELEPORTER_TYPE_ID
-        || typeId === BLACKSMITH_TYPE_ID
-        || typeId === MERCHANT_TYPE_ID
-        || typeId === BANKER_TYPE_ID
-      ),
-    );
-    if (harvestTile) return harvestTile;
+    const world = this.worldNode ?? this.playerNode?.parent;
+    if (world && this.cameraNode && this.playerNode) {
+      const harvestTile = this.chunkManager!.findHarvestableTileAtUiLocation(
+        uiLocation.x,
+        uiLocation.y,
+        this.cameraNode,
+        world,
+        this.playerNode.position.x,
+        this.playerNode.position.y,
+        (blockId) => {
+          const definition = getBlockDefinition(blockId);
+          return definition.requiredHits !== null && !!definition.dropItemId;
+        },
+        (typeId) => (
+          getOreDefinition(typeId) !== null
+          || typeId === TREASURE_TYPE_ID
+          || typeId === DUNGEON_TYPE_ID
+          || typeId === NPC_TYPE_ID
+          || typeId === TELEPORTER_TYPE_ID
+          || typeId === BLACKSMITH_TYPE_ID
+          || typeId === MERCHANT_TYPE_ID
+          || typeId === BANKER_TYPE_ID
+        ),
+      );
+      if (harvestTile) return harvestTile;
+    }
     return this.toWorldTile(uiLocation);
   }
 
   private findBlacksmithAtUi(
     uiLocation: Vec2,
   ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
-    if (!this.chunkManager) return null;
-    const pixel = this.toWorldPixel(uiLocation);
-    return this.chunkManager.findBlacksmithAtWorldPixel(pixel.x, pixel.y);
+    const world = this.worldNode ?? this.playerNode?.parent;
+    if (!this.chunkManager || !this.cameraNode || !world) return null;
+    return this.chunkManager.findBlacksmithAtUiLocation(
+      uiLocation.x,
+      uiLocation.y,
+      this.cameraNode,
+      world,
+    );
   }
 
   private findTeleporterAtUi(
     uiLocation: Vec2,
   ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
-    if (!this.chunkManager) return null;
-    const pixel = this.toWorldPixel(uiLocation);
-    return this.chunkManager.findTeleporterAtWorldPixel(pixel.x, pixel.y);
+    const world = this.worldNode ?? this.playerNode?.parent;
+    if (!this.chunkManager || !this.cameraNode || !world) return null;
+    return this.chunkManager.findTeleporterAtUiLocation(
+      uiLocation.x,
+      uiLocation.y,
+      this.cameraNode,
+      world,
+    );
   }
 
   private findMerchantAtUi(
     uiLocation: Vec2,
   ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
-    if (!this.chunkManager) return null;
-    const pixel = this.toWorldPixel(uiLocation);
-    return this.chunkManager.findMerchantAtWorldPixel(pixel.x, pixel.y);
+    const world = this.worldNode ?? this.playerNode?.parent;
+    if (!this.chunkManager || !this.cameraNode || !world) return null;
+    return this.chunkManager.findMerchantAtUiLocation(
+      uiLocation.x,
+      uiLocation.y,
+      this.cameraNode,
+      world,
+    );
   }
 
   private findBankerAtUi(
     uiLocation: Vec2,
   ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
-    if (!this.chunkManager) return null;
-    const pixel = this.toWorldPixel(uiLocation);
-    return this.chunkManager.findBankerAtWorldPixel(pixel.x, pixel.y);
+    const world = this.worldNode ?? this.playerNode?.parent;
+    if (!this.chunkManager || !this.cameraNode || !world) return null;
+    return this.chunkManager.findBankerAtUiLocation(
+      uiLocation.x,
+      uiLocation.y,
+      this.cameraNode,
+      world,
+    );
   }
 
   private findMonsterAtUi(
     uiLocation: Vec2,
   ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
-    if (!this.chunkManager) return null;
-    const pixel = this.toWorldPixel(uiLocation);
-    return this.chunkManager.findMonsterAtWorldPixel(
-      pixel.x,
-      pixel.y,
+    const world = this.worldNode ?? this.playerNode?.parent;
+    if (!this.chunkManager || !this.cameraNode || !world) return null;
+    return this.chunkManager.findMonsterAtUiLocation(
+      uiLocation.x,
+      uiLocation.y,
+      this.cameraNode,
+      world,
       (typeId) => this.getMonsterDisplaySize(typeId),
     );
   }

@@ -35,7 +35,7 @@ if (-not $Owner -or -not $Repo) {
         }
     }
 }
-if (-not $Owner) { $Owner = "tenard2" }
+if (-not $Owner) { $Owner = "tenard2-max" }
 if (-not $Repo) { $Repo = "ExGame" }
 
 Write-Host "ExGame publish: v$Version -> $Owner/$Repo"

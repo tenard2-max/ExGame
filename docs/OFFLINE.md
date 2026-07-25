@@ -28,17 +28,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-all.ps1
 
 ## 플레이어 실행 방법
 
-1. ZIP을 풀어 `exgame-0.1.0` 폴더를 연다.
-2. `auto-run.bat`(또는 `run-offline.bat`)을 더블클릭한다. (Python 필요: `py` 또는 `python`)
-3. 브라우저가 `http://127.0.0.1:7456/?offline=1`으로 열린다.
-4. 종료하려면 서버 창에서 `Ctrl+C`.
+1. ZIP을 풀어 `exgame-<version>` 폴더를 연다.
+2. `auto-run.bat`(또는 `run-offline.bat` / `start-server.bat`)을 더블클릭한다.
+3. **Python**이 필요합니다 (`py` 또는 `python`, 설치 시 PATH 추가).
+4. 브라우저가 `http://127.0.0.1:7456/?offline=1` 로 열린다.
+5. 종료: 서버 콘솔 창을 닫거나 `Ctrl+C`.
 
-개발 트리에서는 더블클릭:
+### 자주 나는 문제
 
-- `game/auto-run.bat` — 아틀라스 동기화 + 서버 + 브라우저
-- `game/start-server.bat` — 서버만 (이미 실행 중이면 브라우저만)
-- 저장소 루트 `게임실행.bat` — 자동 실행과 동일
-
+| 증상 | 원인 / 조치 |
+|------|-------------|
+| 「이 페이지가 작동하지 않습니다」 | 예전 패키지는 서버보다 브라우저를 먼저 열었습니다. **0.1.6+** 로 교체하세요. 이미 떠 있는 잘못된 서버가 있으면 `start-server.bat -ForceRestart` |
+| bat이 바로 실패 | Python 미설치 또는 PATH 없음 |
+| 포트 사용 중 | `start-server.bat -ForceRestart` 또는 PC 재시작 |
 또는:
 
 ```powershell

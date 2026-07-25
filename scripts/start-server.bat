@@ -2,9 +2,26 @@
 chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start-server.ps1" %*
+
+where py >nul 2>&1
 if errorlevel 1 (
-  echo.
-  echo 서버 기동에 실패했습니다.
-  pause
+  where python >nul 2>&1
+  if errorlevel 1 (
+    echo.
+    echo [오류] Python이 없습니다. py 또는 python 이 PATH에 있어야 합니다.
+    echo 설치: https://www.python.org/downloads/  ^(설치 시 Add to PATH 체크^)
+    echo.
+    pause
+    exit /b 1
+  )
 )
+
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start-server.ps1" %*
+set ERR=%ERRORLEVEL%
+if not "%ERR%"=="0" (
+  echo.
+  echo 서버 기동에 실패했습니다. ^(종료 코드 %ERR%^)
+  pause
+  exit /b %ERR%
+)
+exit /b 0

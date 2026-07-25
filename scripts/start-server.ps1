@@ -21,44 +21,58 @@ if (-not $gameRoot) {
     throw "index.html을 찾을 수 없습니다. 먼저 build-web.ps1 또는 package-release.ps1을 실행하세요."
 }
 
-function Get-ListenersOnPort([int]$ListenPort) {
-    Get-NetTCPConnection -LocalPort $ListenPort -State Listen -ErrorAction SilentlyContinue
+function Test-LocalPortOpen([int]$ListenPort) {
+    try {
+        $client = New-Object System.Net.Sockets.TcpClient
+        $async = $client.BeginConnect("127.0.0.1", $ListenPort, $null, $null)
+        $ok = $async.AsyncWaitHandle.WaitOne(200, $false)
+        if (-not $ok) {
+            $client.Close()
+            return $false
+        }
+        $client.EndConnect($async)
+        $client.Close()
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Get-ListenerPids([int]$ListenPort) {
+    try {
+        $conns = Get-NetTCPConnection -LocalPort $ListenPort -State Listen -ErrorAction SilentlyContinue
+        return @($conns | ForEach-Object { $_.OwningProcess } | Where-Object { $_ -gt 0 } | Select-Object -Unique)
+    } catch {
+        return @()
+    }
 }
 
 function Stop-ListenersOnPort([int]$ListenPort) {
-    $listeners = Get-ListenersOnPort $ListenPort
-    foreach ($conn in $listeners) {
-        $procId = $conn.OwningProcess
-        if ($procId -and $procId -gt 0) {
-            Write-Host "기존 서버 종료 (PID $procId, 포트 $ListenPort)"
-            Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
+    $pids = Get-ListenerPids $ListenPort
+    foreach ($procId in $pids) {
+        Write-Host "기존 서버 종료 (PID $procId, 포트 $ListenPort)"
+        Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
+    }
+    Start-Sleep -Milliseconds 500
+}
+
+function Resolve-PythonCommand {
+    $py = Get-Command py -ErrorAction SilentlyContinue
+    if ($py) {
+        return @{
+            FilePath = $py.Source
+            PrefixArgs = @("-3")
         }
     }
-    Start-Sleep -Milliseconds 400
-}
-
-$python = Get-Command py -ErrorAction SilentlyContinue
-if (-not $python) {
     $python = Get-Command python -ErrorAction SilentlyContinue
+    if ($python) {
+        return @{
+            FilePath = $python.Source
+            PrefixArgs = @()
+        }
+    }
+    return $null
 }
-if (-not $python) {
-    throw "로컬 서버 실행에는 Python(py 또는 python)이 필요합니다. 설치 후 다시 실행하세요."
-}
-
-$url = "http://127.0.0.1:$Port/?offline=1&fullscreen=1"
-$existing = @(Get-ListenersOnPort $Port)
-
-if ($ForceRestart -and $existing.Count -gt 0) {
-    Stop-ListenersOnPort $Port
-    $existing = @()
-}
-
-Write-Host "========================================"
-Write-Host " ExGame 로컬 서버"
-Write-Host "========================================"
-Write-Host "접속: $url"
-Write-Host "경로: $gameRoot"
-Write-Host ""
 
 function Open-GameInFullscreenBrowser([string]$TargetUrl) {
     $launchers = @(
@@ -87,22 +101,82 @@ function Open-GameInFullscreenBrowser([string]$TargetUrl) {
         return
     }
 
-    Write-Host "Chrome/Edge를 찾지 못해 기본 브라우저로 엽니다. (페이지에서 전체화면 전환)"
+    Write-Host "Chrome/Edge를 찾지 못해 기본 브라우저로 엽니다."
     Start-Process $TargetUrl
 }
 
-if ($existing.Count -gt 0) {
+function Wait-ForPort([int]$ListenPort, [int]$TimeoutMs = 15000) {
+    $deadline = (Get-Date).AddMilliseconds($TimeoutMs)
+    while ((Get-Date) -lt $deadline) {
+        if (Test-LocalPortOpen $ListenPort) { return $true }
+        Start-Sleep -Milliseconds 150
+    }
+    return $false
+}
+
+$pythonCmd = Resolve-PythonCommand
+if (-not $pythonCmd) {
+    throw "로컬 서버 실행에는 Python(py 또는 python)이 필요합니다. https://www.python.org/downloads/ 에서 설치 후 다시 실행하세요."
+}
+
+$url = "http://127.0.0.1:$Port/?offline=1&fullscreen=1"
+$portBusy = Test-LocalPortOpen $Port
+
+if ($ForceRestart -and $portBusy) {
+    Stop-ListenersOnPort $Port
+    $portBusy = $false
+}
+
+Write-Host "========================================"
+Write-Host " ExGame 로컬 서버"
+Write-Host "========================================"
+Write-Host "접속: $url"
+Write-Host "경로: $gameRoot"
+Write-Host "Python: $($pythonCmd.FilePath)"
+Write-Host ""
+
+if ($portBusy) {
     Write-Host "포트 $Port 에 이미 서버가 실행 중입니다. 기존 서버를 재사용합니다."
     if (-not $NoBrowser) {
         Open-GameInFullscreenBrowser $url
     }
-    Write-Host "브라우저만 열었습니다. (서버 재기동: -ForceRestart)"
+    Write-Host "브라우저만 열었습니다. (서버 재기동: start-server.bat -ForceRestart)"
     return
 }
 
+# 서버를 먼저 띄운 뒤, 포트가 열리면 브라우저를 엽니다.
+# (이전에는 브라우저를 먼저 열어 '이 페이지가 작동하지 않습니다'가 자주 났습니다.)
+$argList = @()
+$argList += $pythonCmd.PrefixArgs
+$argList += @("-m", "http.server", "$Port", "--bind", "127.0.0.1", "--directory", $gameRoot)
+
+Write-Host "서버 기동 중..."
+$server = Start-Process `
+    -FilePath $pythonCmd.FilePath `
+    -ArgumentList $argList `
+    -WorkingDirectory $gameRoot `
+    -PassThru `
+    -WindowStyle Hidden
+
+if (-not (Wait-ForPort -ListenPort $Port -TimeoutMs 20000)) {
+    if ($server -and -not $server.HasExited) {
+        Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+    }
+    throw "포트 $Port 에서 서버가 기동되지 않았습니다. Python/방화벽/포트 충돌을 확인하세요."
+}
+
+Write-Host "서버 준비 완료 (PID $($server.Id))"
 if (-not $NoBrowser) {
     Open-GameInFullscreenBrowser $url
 }
 
-Write-Host "서버 기동 중... 종료하려면 Ctrl+C"
-& $python.Source -m http.server $Port --bind 127.0.0.1 --directory $gameRoot
+Write-Host ""
+Write-Host "플레이 중... 이 창을 닫으면 서버가 종료됩니다."
+Write-Host "종료: Ctrl+C 또는 창 닫기"
+try {
+    Wait-Process -Id $server.Id
+} finally {
+    if ($server -and -not $server.HasExited) {
+        Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+    }
+}

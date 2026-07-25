@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.14 — 2026-07-26
+
+### 수정
+- 설정 패널 +/-·기본값·닫기: getLocation→screenToWorld→버튼 world AABB 히트 (UI 수동 매핑 제거)
 ## 0.1.13 — 2026-07-26
 
 ### 수정

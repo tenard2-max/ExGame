@@ -1,5 +1,6 @@
 import {
   _decorator,
+  Camera,
   Color,
   Component,
   EventMouse,
@@ -12,6 +13,7 @@ import {
   Node,
   UITransform,
   Vec2,
+  Vec3,
 } from 'cc';
 
 import type { BgmPlaylistPlayer } from '../audio/bgm-playlist-player';
@@ -27,9 +29,12 @@ import {
   isEscapeKey,
 } from '../input/dom-keyboard';
 import {
+  hitTestWorldBounds,
+  screenToWorldPoint,
+} from '../world/world-ui-hit';
+import {
   DESIGN_HEIGHT,
   DESIGN_WIDTH,
-  normalizeUiToDesign,
   setSettingsPanelOpen,
   SETTINGS_BUTTON_SIZE,
   SETTINGS_LIST_VIEW_HEIGHT,
@@ -53,6 +58,8 @@ interface NodeHitTarget {
 @ccclass('SettingsHud')
 export class SettingsHud extends Component {
   private readonly pointerLocation = new Vec2();
+  private readonly pointerScreen = new Vec2();
+  private readonly worldHitTmp = new Vec3();
   private balance: GameBalanceSettings | null = null;
   private sfx: SfxPlayer | null = null;
   private cameraNode: Node | null = null;
@@ -155,10 +162,11 @@ export class SettingsHud extends Component {
   private onMouseDown(event: EventMouse): void {
     if (event.getButton() !== EventMouse.BUTTON_LEFT) return;
     event.getUILocation(this.pointerLocation);
+    event.getLocation(this.pointerScreen);
     this.pressConsumed = false;
     this.sfx?.unlock();
     if (!this.isOpen) return;
-    if (this.tryHandlePress(this.pointerLocation.x, this.pointerLocation.y, true)) {
+    if (this.tryHandlePress(this.pointerScreen.x, this.pointerScreen.y)) {
       this.pressConsumed = true;
       event.propagationStopped = true;
     }
@@ -166,10 +174,11 @@ export class SettingsHud extends Component {
 
   private onTouchStart(event: EventTouch): void {
     event.getUILocation(this.pointerLocation);
+    event.getLocation(this.pointerScreen);
     this.pressConsumed = false;
     this.sfx?.unlock();
     if (!this.isOpen) return;
-    if (this.tryHandlePress(this.pointerLocation.x, this.pointerLocation.y, true)) {
+    if (this.tryHandlePress(this.pointerScreen.x, this.pointerScreen.y)) {
       this.pressConsumed = true;
     }
   }
@@ -177,6 +186,7 @@ export class SettingsHud extends Component {
   private onMouseUp(event: EventMouse): void {
     if (event.getButton() !== EventMouse.BUTTON_LEFT) return;
     event.getUILocation(this.pointerLocation);
+    event.getLocation(this.pointerScreen);
     if (this.pressConsumed) {
       this.pressConsumed = false;
       return;
@@ -186,6 +196,7 @@ export class SettingsHud extends Component {
 
   private onTouchEnd(event: EventTouch): void {
     event.getUILocation(this.pointerLocation);
+    event.getLocation(this.pointerScreen);
     if (this.pressConsumed) {
       this.pressConsumed = false;
       return;
@@ -195,11 +206,10 @@ export class SettingsHud extends Component {
 
   private onMouseWheel(event: EventMouse): void {
     if (!this.isOpen) return;
-    const design = normalizeUiToDesign(
-      event.getUILocation().x,
-      event.getUILocation().y,
-    );
-    if (!this.isDesignInsidePanel(design.x, design.y)) return;
+    event.getLocation(this.pointerScreen);
+    if (!this.isScreenInsidePanel(this.pointerScreen.x, this.pointerScreen.y)) {
+      return;
+    }
 
     const scrollY = event.getScrollY();
     this.scrollOffset = clampScroll(
@@ -211,61 +221,64 @@ export class SettingsHud extends Component {
 
   private handlePointerRelease(): void {
     if (!this.isOpen) return;
-    if (this.tryHandlePress(this.pointerLocation.x, this.pointerLocation.y, false)) {
-      return;
-    }
-    const design = normalizeUiToDesign(
-      this.pointerLocation.x,
-      this.pointerLocation.y,
-    );
-    if (!this.isDesignInsidePanel(design.x, design.y)) {
+    // 버튼은 press에서 처리. release는 패널 밖 클릭 시 닫기만.
+    if (!this.isScreenInsidePanel(this.pointerScreen.x, this.pointerScreen.y)) {
       this.setOpen(false);
     }
   }
 
-  private tryHandlePress(
-    rawUiX: number,
-    rawUiY: number,
-    onPressOnly: boolean,
-  ): boolean {
+  private tryHandlePress(screenX: number, screenY: number): boolean {
     this.rebuildHitTargets();
-    const hit = this.findHitTarget(rawUiX, rawUiY);
+    const hit = this.findHitTarget(screenX, screenY);
     if (!hit) return false;
-    if (onPressOnly && !hit.onPress) return false;
-    if (!onPressOnly && hit.onPress) return false;
     hit.action();
     return true;
   }
 
-  private findHitTarget(rawUiX: number, rawUiY: number): NodeHitTarget | null {
-    if (!this.cameraNode) return null;
-    const design = normalizeUiToDesign(rawUiX, rawUiY);
-    const camera = this.cameraNode.position;
-    const worldX = camera.x + design.x - DESIGN_WIDTH / 2;
-    const worldY = camera.y + design.y - DESIGN_HEIGHT / 2;
+  /** 렌더와 동일: screen → camera.screenToWorld → 버튼 world AABB. */
+  private findHitTarget(screenX: number, screenY: number): NodeHitTarget | null {
+    const camera = this.cameraNode?.getComponent(Camera);
+    if (!camera) return null;
+    screenToWorldPoint(camera, screenX, screenY, this.worldHitTmp);
+    const wx = this.worldHitTmp.x;
+    const wy = this.worldHitTmp.y;
 
+    let best: NodeHitTarget | null = null;
+    let bestArea = Number.POSITIVE_INFINITY;
     for (const target of this.nodeHits) {
       if (!target.node.isValid || !target.node.activeInHierarchy) continue;
       const transform = target.node.getComponent(UITransform);
       if (!transform) continue;
-      const pos = target.node.worldPosition;
-      const halfW = transform.contentSize.width / 2 + 8;
-      const halfH = transform.contentSize.height / 2 + 8;
-      if (
-        Math.abs(worldX - pos.x) <= halfW
-        && Math.abs(worldY - pos.y) <= halfH
-      ) {
-        return target;
+      const rect = transform.getBoundingBoxToWorld();
+      const bounds = {
+        minX: rect.xMin - 8,
+        maxX: rect.xMax + 8,
+        minY: rect.yMin - 8,
+        maxY: rect.yMax + 8,
+        centerX: (rect.xMin + rect.xMax) / 2,
+        centerY: (rect.yMin + rect.yMax) / 2,
+      };
+      if (!hitTestWorldBounds(wx, wy, bounds, 0)) continue;
+      const area = (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY);
+      if (area < bestArea) {
+        bestArea = area;
+        best = target;
       }
     }
-    return null;
+    return best;
   }
 
-  private isDesignInsidePanel(designX: number, designY: number): boolean {
-    const localX = designX - (18 + this.panelOffsetX);
-    const localY = designY - (DESIGN_HEIGHT - 18 + this.panelOffsetY);
-    return Math.abs(localX) <= SETTINGS_PANEL_WIDTH / 2
-      && Math.abs(localY) <= SETTINGS_PANEL_HEIGHT / 2;
+  private isScreenInsidePanel(screenX: number, screenY: number): boolean {
+    const camera = this.cameraNode?.getComponent(Camera);
+    if (!camera || !this.panelRoot) return false;
+    const ui = this.panelRoot.getComponent(UITransform);
+    if (!ui) return false;
+    screenToWorldPoint(camera, screenX, screenY, this.worldHitTmp);
+    const rect = ui.getBoundingBoxToWorld();
+    return this.worldHitTmp.x >= rect.xMin
+      && this.worldHitTmp.x <= rect.xMax
+      && this.worldHitTmp.y >= rect.yMin
+      && this.worldHitTmp.y <= rect.yMax;
   }
 
   private refreshValues(): void {
@@ -354,6 +367,7 @@ export class SettingsHud extends Component {
       this.nodeHits.push({
         node: reset,
         action: () => this.balance?.resetToDefaults(),
+        onPress: true,
       });
     }
     const close = this.panelRoot.getChildByName('Action_닫기');
@@ -361,6 +375,7 @@ export class SettingsHud extends Component {
       this.nodeHits.push({
         node: close,
         action: () => this.setOpen(false),
+        onPress: true,
       });
     }
 
@@ -376,6 +391,7 @@ export class SettingsHud extends Component {
       this.nodeHits.push({
         node: child,
         action: () => this.balance?.adjust(row.key, isPlus ? 1 : -1),
+        onPress: true,
       });
     }
   }

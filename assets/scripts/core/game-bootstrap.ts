@@ -558,6 +558,7 @@ export class GameBootstrap extends Component {
           },
         });
       },
+      worldNode,
     );
 
     const firstSample = generator.generateChunk(worldSeed, { x: 0, y: 0 });

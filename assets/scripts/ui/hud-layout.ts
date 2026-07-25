@@ -7,6 +7,7 @@ export const DESIGN_HEIGHT = 1440;
 
 const uiToScreenPos = new Vec3();
 const uiToWorldPos = new Vec3();
+const worldLocalPos = new Vec3();
 
 /**
  * getUILocation(가시 영역) → 디자인 좌표(2560×1440)로 변환합니다.
@@ -24,11 +25,11 @@ export function normalizeUiToDesign(uiX: number, uiY: number): { x: number; y: n
 }
 
 /**
- * getUILocation → Canvas 로컬 월드 픽셀(카메라·청크와 동일 공간).
+ * getUILocation → Canvas 로컬 픽셀(카메라 뷰 공간).
  *
  * Cocos `_convertToUISpace` 의 역변환(UI→스크린) 후 Camera.screenToWorld 를 씁니다.
- * 프레임/뷰포트가 어긋난 상태에서 visible 중심만 가정하면 채집 클릭이
- * 한 타일 위로 밀리는 증상이 납니다.
+ * HUD·툴팁 등 Canvas 자식 배치용입니다. 월드 오브젝트 히트에는
+ * `uiLocationToWorldLocal` 을 쓰세요(World 스케일/줌 반영).
  */
 export function uiLocationToCanvasLocal(
   uiX: number,
@@ -64,6 +65,47 @@ export function uiLocationToCanvasLocal(
     x: uiToWorldPos.x - canvas.worldPosition.x,
     y: uiToWorldPos.y - canvas.worldPosition.y,
   };
+}
+
+/**
+ * getUILocation → World 노드 로컬 픽셀(청크·NPC·자원 히트박스와 동일 공간).
+ *
+ * 1) UI → 스크린 → Camera.screenToWorld (뷰포트·카메라 위치 반영)
+ * 2) World.inverseTransformPoint (핀치 줌용 World.scale 역변환)
+ *
+ * hitbox 자체는 확대/축소하지 않습니다. HUD는 normalizeUiToDesign 을 유지하세요.
+ */
+export function uiLocationToWorldLocal(
+  uiX: number,
+  uiY: number,
+  cameraNode: Node,
+  worldNode: Node,
+): { x: number; y: number } {
+  const camera = cameraNode.getComponent(Camera);
+  const visible = view.getVisibleSize();
+  const origin = view.getVisibleOrigin();
+  if (!camera) {
+    const approxX = cameraNode.position.x + (uiX - origin.x) - visible.width / 2;
+    const approxY = cameraNode.position.y + (uiY - origin.y) - visible.height / 2;
+    const scaleX = worldNode.scale.x || 1;
+    const scaleY = worldNode.scale.y || 1;
+    return {
+      x: (approxX - worldNode.position.x) / scaleX,
+      y: (approxY - worldNode.position.y) / scaleY,
+    };
+  }
+
+  const viewport = view.getViewportRect();
+  const scaleX = view.getScaleX() || 1;
+  const scaleY = view.getScaleY() || 1;
+  uiToScreenPos.set(
+    (uiX - origin.x) * scaleX + viewport.x,
+    (uiY - origin.y) * scaleY + viewport.y,
+    0,
+  );
+  camera.screenToWorld(uiToScreenPos, uiToWorldPos);
+  worldNode.inverseTransformPoint(worldLocalPos, uiToWorldPos);
+  return { x: worldLocalPos.x, y: worldLocalPos.y };
 }
 
 export const HOTBAR_SLOT_SIZE = 84;

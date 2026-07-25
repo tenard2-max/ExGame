@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.7 — 2026-07-26
+
+### 수정
+- 핀치 줌 후 NPC/자원 터치 판정: UI→Camera.screenToWorld→World.inverseTransformPoint 로 월드 로컬 좌표 변환 (hitbox 스케일 변조 없음)
+
 ## 0.1.6 — 2026-07-26
 
 ### 수정

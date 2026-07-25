@@ -53,7 +53,7 @@ import type {
 import type { WorldSeed } from '../world/world-types';
 import {
   isUiLocationOverHud,
-  uiLocationToCanvasLocal,
+  uiLocationToWorldLocal,
 } from '../ui/hud-layout';
 import type { TooltipHud } from '../ui/tooltip-hud';
 import type { PlayerStatsModel } from './player-stats-model';
@@ -114,6 +114,7 @@ export class BlockInteractionController extends Component {
   private inputSource: UnifiedInput | null = null;
   private playerNode: Node | null = null;
   private cameraNode: Node | null = null;
+  private worldNode: Node | null = null;
   private chunkManager: RuntimeChunkManager | null = null;
   private inventory: InventoryModel | null = null;
   private playerStats: PlayerStatsModel | null = null;
@@ -156,10 +157,12 @@ export class BlockInteractionController extends Component {
     gears?: GearInstanceStore | null,
     openMerchant?: () => void,
     openBanker?: () => void,
+    worldNode?: Node | null,
   ): void {
     this.inputSource = inputSource;
     this.playerNode = playerNode;
     this.cameraNode = cameraNode;
+    this.worldNode = worldNode ?? playerNode.parent;
     this.chunkManager = chunkManager;
     this.inventory = inventory;
     this.playerStats = playerStats;
@@ -920,10 +923,15 @@ export class BlockInteractionController extends Component {
   }
 
   private toWorldPixel(uiLocation: Vec2): { x: number; y: number } {
-    return uiLocationToCanvasLocal(
+    const world = this.worldNode ?? this.playerNode?.parent;
+    if (!world) {
+      return { x: 0, y: 0 };
+    }
+    return uiLocationToWorldLocal(
       uiLocation.x,
       uiLocation.y,
       this.cameraNode!,
+      world,
     );
   }
 

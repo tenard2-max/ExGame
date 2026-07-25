@@ -95,6 +95,21 @@ public final class GameUpdateManager {
         }
     }
 
+    /**
+     * 한 번만 OTA 캐시를 비웁니다. (깨진 OTA로 하얀 화면이 고착된 기기 복구용)
+     */
+    public void wipeOtaOnce(String flagKey) {
+        SharedPreferences p = prefs();
+        if (p.getBoolean(flagKey, false)) return;
+        Log.w(TAG, "wiping OTA once: " + flagKey);
+        deleteRecursive(getOtaRootDir());
+        p.edit()
+                .remove(KEY_WWW_VERSION)
+                .remove(KEY_WWW_VERSION_CODE)
+                .putBoolean(flagKey, true)
+                .apply();
+    }
+
     public String getInstalledWwwVersion() {
         return prefs().getString(KEY_WWW_VERSION, bundledVersionName());
     }

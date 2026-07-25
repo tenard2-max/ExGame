@@ -26,7 +26,7 @@ export interface GenerationContext {
   readonly random: DeterministicRandom;
 }
 
-/** 첫 번째 생성 단계: Seed → Biome → Terrain → River → Forest. */
+/** 첫 번째 생성 단계: Seed → 월드좌표 타일 영역 → Terrain. */
 export interface WorldGenerationPipeline {
   generateTerrain(context: GenerationContext): TerrainChunkData;
 }

@@ -1,0 +1,40 @@
+{
+  "items": {
+    "weapon-iron-sword": {
+      "file": "weapon-iron-sword.png",
+      "width": 48,
+      "height": 48,
+      "itemId": "weapon-iron-sword"
+    },
+    "weapon-mithril-sword": {
+      "file": "weapon-mithril-sword.png",
+      "width": 45,
+      "height": 48,
+      "itemId": "weapon-mithril-sword"
+    },
+    "weapon-orichalcum-sword": {
+      "file": "weapon-orichalcum-sword.png",
+      "width": 46,
+      "height": 48,
+      "itemId": "weapon-orichalcum-sword"
+    },
+    "armor-leather": {
+      "file": "armor-leather.png",
+      "width": 48,
+      "height": 45,
+      "itemId": "armor-leather"
+    },
+    "armor-chain": {
+      "file": "armor-chain.png",
+      "width": 48,
+      "height": 38,
+      "itemId": "armor-chain"
+    },
+    "armor-plate": {
+      "file": "armor-plate.png",
+      "width": 48,
+      "height": 39,
+      "itemId": "armor-plate"
+    }
+  }
+}

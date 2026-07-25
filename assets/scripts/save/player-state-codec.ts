@@ -1,5 +1,8 @@
 import { CHUNK_SIZE_TILES } from '../core/schema';
 import type { InventoryModel } from '../inventory/inventory-model';
+import type { TeleportWaypoint } from '../npc/teleport-types';
+import type { BankSaveState } from '../npc/bank-types';
+import type { GearSaveState } from '../player/player-types';
 import type { PlayerStatsModel } from '../player/player-stats-model';
 import type {
   PlayerPosition,
@@ -45,10 +48,36 @@ export function buildPlayerState(
   worldY: number,
   inventory: InventoryModel,
   stats: PlayerStatsModel,
+  characterId?: string,
+  teleportWaypoints?: ReadonlyArray<TeleportWaypoint>,
+  gearState?: GearSaveState,
+  bankState?: BankSaveState,
 ): PlayerState {
   return {
     position: encodePlayerPosition(worldX, worldY),
     stats: stats.toStats(),
     inventory: inventory.toState(),
+    characterId,
+    teleportWaypoints: teleportWaypoints
+      ? teleportWaypoints.map((entry) => ({ ...entry }))
+      : undefined,
+    // gearState는 항상 기록합니다. 생략 후 로드하면 강화 장비가 통째로 비워집니다.
+    gearState: {
+      gears: (gearState?.gears ?? []).map((gear) => ({
+        ...gear,
+        options: { ...gear.options },
+      })),
+      equippedWeaponGearId: gearState?.equippedWeaponGearId ?? null,
+      equippedArmorGearId: gearState?.equippedArmorGearId ?? null,
+    },
+    bankState: bankState
+      ? {
+          depositedArk: bankState.depositedArk,
+          loan: bankState.loan ? { ...bankState.loan } : null,
+          loanedTodayArk: bankState.loanedTodayArk,
+          loanDay: bankState.loanDay,
+          waypoints: bankState.waypoints.map((entry) => ({ ...entry })),
+        }
+      : undefined,
   };
 }

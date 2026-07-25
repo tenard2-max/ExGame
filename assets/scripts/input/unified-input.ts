@@ -27,13 +27,16 @@ export class UnifiedInput extends Component {
   private readonly pointerCurrent = new Vec2();
   private readonly keyboardDirection = new Vec2();
   private readonly pointerDirection = new Vec2();
+  private readonly virtualDirection = new Vec2();
 
   private readonly pendingTapLocation = new Vec2();
+  private readonly hoverLocation = new Vec2();
   private activeTouchId: number | null = null;
   private isMouseDragging = false;
   private pointerDownAtMs = 0;
   private pointerMaxDistance = 0;
   private hasPendingTap = false;
+  private hasHover = false;
 
   protected onEnable(): void {
     input.on(Input.EventType.KEY_DOWN, this.onKeyDown, this);
@@ -64,11 +67,25 @@ export class UnifiedInput extends Component {
     this.readKeyboardDirection(this.keyboardDirection);
     this.readPointerDirection(this.pointerDirection);
     Vec2.add(out, this.keyboardDirection, this.pointerDirection);
+    Vec2.add(out, out, this.virtualDirection);
 
     if (out.lengthSqr() > 1) {
       out.normalize();
     }
     return out;
+  }
+
+  /**
+   * 모바일 십자 패드 등 DOM 가상 스틱 입력을 설정합니다.
+   * x/y 는 -1~1 범위로 클램프합니다.
+   */
+  setVirtualDirection(x: number, y: number): void {
+    const clampedX = Math.max(-1, Math.min(1, x));
+    const clampedY = Math.max(-1, Math.min(1, y));
+    this.virtualDirection.set(clampedX, clampedY);
+    if (this.virtualDirection.lengthSqr() > 1) {
+      this.virtualDirection.normalize();
+    }
   }
 
   /**
@@ -79,6 +96,26 @@ export class UnifiedInput extends Component {
     if (!this.hasPendingTap) return false;
     out.set(this.pendingTapLocation);
     this.hasPendingTap = false;
+    return true;
+  }
+
+  /**
+   * 포인터를 움직이지 않고 누르고 있는 상태(채집 제스처)인지 반환합니다.
+   * 드래그(이동)로 전환되면 false가 됩니다. 마우스·터치 공통입니다.
+   */
+  isPointerHeldStill(out: Vec2): boolean {
+    const isPointerDown = this.isMouseDragging || this.activeTouchId !== null;
+    if (!isPointerDown || this.pointerMaxDistance > POINTER_DEAD_ZONE) {
+      return false;
+    }
+    out.set(this.pointerStart);
+    return true;
+  }
+
+  /** 마우스 커서의 현재 UI 좌표입니다. 터치 전용 기기에서는 false입니다. */
+  getHoverLocation(out: Vec2): boolean {
+    if (!this.hasHover) return false;
+    out.set(this.hoverLocation);
     return true;
   }
 
@@ -99,6 +136,9 @@ export class UnifiedInput extends Component {
   }
 
   private onMouseMove(event: EventMouse): void {
+    event.getUILocation(this.hoverLocation);
+    this.hasHover = true;
+
     if (!this.isMouseDragging) return;
     event.getUILocation(this.pointerCurrent);
     this.trackPointerDistance();
@@ -195,7 +235,9 @@ export class UnifiedInput extends Component {
     this.activeTouchId = null;
     this.isMouseDragging = false;
     this.hasPendingTap = false;
+    this.hasHover = false;
     this.pointerStart.set(0, 0);
     this.pointerCurrent.set(0, 0);
+    this.virtualDirection.set(0, 0);
   }
 }

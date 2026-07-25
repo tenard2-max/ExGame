@@ -1,0 +1,1256 @@
+{
+  "tileSize": 32,
+  "categories": {
+    "tree": 35,
+    "rock": 35,
+    "water": 35,
+    "dirt": 35,
+    "grass": 14
+  },
+  "blockHints": {
+    "tree": "tree",
+    "rock": "rock",
+    "water": "water",
+    "dirt": "mud",
+    "grass": "grass"
+  },
+  "tiles": [
+    {
+      "file": "assets/textures/tiles/tree/tree_01_000.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 0,
+      "row": 0,
+      "col": 0
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_001.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 1,
+      "row": 0,
+      "col": 1
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_002.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 2,
+      "row": 0,
+      "col": 2
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_003.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 3,
+      "row": 1,
+      "col": 0
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_004.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 4,
+      "row": 1,
+      "col": 1
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_005.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 5,
+      "row": 1,
+      "col": 2
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_006.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 6,
+      "row": 2,
+      "col": 0
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_007.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 7,
+      "row": 2,
+      "col": 1
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_008.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 8,
+      "row": 2,
+      "col": 2
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_009.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 9,
+      "row": 3,
+      "col": 0
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_010.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 10,
+      "row": 3,
+      "col": 1
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_011.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 11,
+      "row": 3,
+      "col": 2
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_012.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 12,
+      "row": 4,
+      "col": 0
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_013.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 13,
+      "row": 4,
+      "col": 1
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_014.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 14,
+      "row": 4,
+      "col": 2
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_015.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 15,
+      "row": 5,
+      "col": 0
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_016.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 16,
+      "row": 5,
+      "col": 1
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_017.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 17,
+      "row": 5,
+      "col": 2
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_018.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 18,
+      "row": 6,
+      "col": 0
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_019.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 19,
+      "row": 6,
+      "col": 1
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_01_020.png",
+      "category": "tree",
+      "sheet": 1,
+      "index": 20,
+      "row": 6,
+      "col": 2
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_000.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 0,
+      "row": 0,
+      "col": 3
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_001.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 1,
+      "row": 0,
+      "col": 4
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_002.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 2,
+      "row": 0,
+      "col": 5
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_003.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 3,
+      "row": 1,
+      "col": 3
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_004.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 4,
+      "row": 1,
+      "col": 4
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_005.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 5,
+      "row": 1,
+      "col": 5
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_006.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 6,
+      "row": 2,
+      "col": 3
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_007.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 7,
+      "row": 2,
+      "col": 4
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_008.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 8,
+      "row": 2,
+      "col": 5
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_009.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 9,
+      "row": 3,
+      "col": 3
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_010.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 10,
+      "row": 3,
+      "col": 4
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_011.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 11,
+      "row": 3,
+      "col": 5
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_012.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 12,
+      "row": 4,
+      "col": 3
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_013.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 13,
+      "row": 4,
+      "col": 4
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_014.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 14,
+      "row": 4,
+      "col": 5
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_015.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 15,
+      "row": 5,
+      "col": 3
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_016.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 16,
+      "row": 5,
+      "col": 4
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_017.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 17,
+      "row": 5,
+      "col": 5
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_018.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 18,
+      "row": 6,
+      "col": 3
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_019.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 19,
+      "row": 6,
+      "col": 4
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_01_020.png",
+      "category": "rock",
+      "sheet": 1,
+      "index": 20,
+      "row": 6,
+      "col": 5
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_000.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 0,
+      "row": 0,
+      "col": 6
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_001.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 1,
+      "row": 0,
+      "col": 7
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_002.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 2,
+      "row": 0,
+      "col": 8
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_003.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 3,
+      "row": 1,
+      "col": 6
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_004.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 4,
+      "row": 1,
+      "col": 7
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_005.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 5,
+      "row": 1,
+      "col": 8
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_006.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 6,
+      "row": 2,
+      "col": 6
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_007.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 7,
+      "row": 2,
+      "col": 7
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_008.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 8,
+      "row": 2,
+      "col": 8
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_009.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 9,
+      "row": 3,
+      "col": 6
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_010.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 10,
+      "row": 3,
+      "col": 7
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_011.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 11,
+      "row": 3,
+      "col": 8
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_012.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 12,
+      "row": 4,
+      "col": 6
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_013.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 13,
+      "row": 4,
+      "col": 7
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_014.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 14,
+      "row": 4,
+      "col": 8
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_015.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 15,
+      "row": 5,
+      "col": 6
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_016.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 16,
+      "row": 5,
+      "col": 7
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_017.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 17,
+      "row": 5,
+      "col": 8
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_018.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 18,
+      "row": 6,
+      "col": 6
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_019.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 19,
+      "row": 6,
+      "col": 7
+    },
+    {
+      "file": "assets/textures/tiles/water/water_01_020.png",
+      "category": "water",
+      "sheet": 1,
+      "index": 20,
+      "row": 6,
+      "col": 8
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_000.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 0,
+      "row": 0,
+      "col": 9
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_001.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 1,
+      "row": 0,
+      "col": 10
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_002.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 2,
+      "row": 0,
+      "col": 11
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_003.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 3,
+      "row": 1,
+      "col": 9
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_004.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 4,
+      "row": 1,
+      "col": 10
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_005.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 5,
+      "row": 1,
+      "col": 11
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_006.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 6,
+      "row": 2,
+      "col": 9
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_007.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 7,
+      "row": 2,
+      "col": 10
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_008.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 8,
+      "row": 2,
+      "col": 11
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_009.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 9,
+      "row": 3,
+      "col": 9
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_010.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 10,
+      "row": 3,
+      "col": 10
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_011.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 11,
+      "row": 3,
+      "col": 11
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_012.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 12,
+      "row": 4,
+      "col": 9
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_013.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 13,
+      "row": 4,
+      "col": 10
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_014.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 14,
+      "row": 4,
+      "col": 11
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_015.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 15,
+      "row": 5,
+      "col": 9
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_016.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 16,
+      "row": 5,
+      "col": 10
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_017.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 17,
+      "row": 5,
+      "col": 11
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_018.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 18,
+      "row": 6,
+      "col": 9
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_019.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 19,
+      "row": 6,
+      "col": 10
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_01_020.png",
+      "category": "dirt",
+      "sheet": 1,
+      "index": 20,
+      "row": 6,
+      "col": 11
+    },
+    {
+      "file": "assets/textures/tiles/water/water_02_000.png",
+      "category": "water",
+      "sheet": 2,
+      "index": 0,
+      "row": 0,
+      "col": 0
+    },
+    {
+      "file": "assets/textures/tiles/water/water_02_001.png",
+      "category": "water",
+      "sheet": 2,
+      "index": 1,
+      "row": 0,
+      "col": 1
+    },
+    {
+      "file": "assets/textures/tiles/water/water_02_002.png",
+      "category": "water",
+      "sheet": 2,
+      "index": 2,
+      "row": 1,
+      "col": 0
+    },
+    {
+      "file": "assets/textures/tiles/water/water_02_003.png",
+      "category": "water",
+      "sheet": 2,
+      "index": 3,
+      "row": 1,
+      "col": 1
+    },
+    {
+      "file": "assets/textures/tiles/water/water_02_004.png",
+      "category": "water",
+      "sheet": 2,
+      "index": 4,
+      "row": 2,
+      "col": 0
+    },
+    {
+      "file": "assets/textures/tiles/water/water_02_005.png",
+      "category": "water",
+      "sheet": 2,
+      "index": 5,
+      "row": 2,
+      "col": 1
+    },
+    {
+      "file": "assets/textures/tiles/water/water_02_006.png",
+      "category": "water",
+      "sheet": 2,
+      "index": 6,
+      "row": 3,
+      "col": 0
+    },
+    {
+      "file": "assets/textures/tiles/water/water_02_007.png",
+      "category": "water",
+      "sheet": 2,
+      "index": 7,
+      "row": 3,
+      "col": 1
+    },
+    {
+      "file": "assets/textures/tiles/water/water_02_008.png",
+      "category": "water",
+      "sheet": 2,
+      "index": 8,
+      "row": 4,
+      "col": 0
+    },
+    {
+      "file": "assets/textures/tiles/water/water_02_009.png",
+      "category": "water",
+      "sheet": 2,
+      "index": 9,
+      "row": 4,
+      "col": 1
+    },
+    {
+      "file": "assets/textures/tiles/water/water_02_010.png",
+      "category": "water",
+      "sheet": 2,
+      "index": 10,
+      "row": 5,
+      "col": 0
+    },
+    {
+      "file": "assets/textures/tiles/water/water_02_011.png",
+      "category": "water",
+      "sheet": 2,
+      "index": 11,
+      "row": 5,
+      "col": 1
+    },
+    {
+      "file": "assets/textures/tiles/water/water_02_012.png",
+      "category": "water",
+      "sheet": 2,
+      "index": 12,
+      "row": 6,
+      "col": 0
+    },
+    {
+      "file": "assets/textures/tiles/water/water_02_013.png",
+      "category": "water",
+      "sheet": 2,
+      "index": 13,
+      "row": 6,
+      "col": 1
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_02_000.png",
+      "category": "rock",
+      "sheet": 2,
+      "index": 0,
+      "row": 0,
+      "col": 2
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_02_001.png",
+      "category": "rock",
+      "sheet": 2,
+      "index": 1,
+      "row": 0,
+      "col": 3
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_02_002.png",
+      "category": "rock",
+      "sheet": 2,
+      "index": 2,
+      "row": 1,
+      "col": 2
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_02_003.png",
+      "category": "rock",
+      "sheet": 2,
+      "index": 3,
+      "row": 1,
+      "col": 3
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_02_004.png",
+      "category": "rock",
+      "sheet": 2,
+      "index": 4,
+      "row": 2,
+      "col": 2
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_02_005.png",
+      "category": "rock",
+      "sheet": 2,
+      "index": 5,
+      "row": 2,
+      "col": 3
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_02_006.png",
+      "category": "rock",
+      "sheet": 2,
+      "index": 6,
+      "row": 3,
+      "col": 2
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_02_007.png",
+      "category": "rock",
+      "sheet": 2,
+      "index": 7,
+      "row": 3,
+      "col": 3
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_02_008.png",
+      "category": "rock",
+      "sheet": 2,
+      "index": 8,
+      "row": 4,
+      "col": 2
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_02_009.png",
+      "category": "rock",
+      "sheet": 2,
+      "index": 9,
+      "row": 4,
+      "col": 3
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_02_010.png",
+      "category": "rock",
+      "sheet": 2,
+      "index": 10,
+      "row": 5,
+      "col": 2
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_02_011.png",
+      "category": "rock",
+      "sheet": 2,
+      "index": 11,
+      "row": 5,
+      "col": 3
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_02_012.png",
+      "category": "rock",
+      "sheet": 2,
+      "index": 12,
+      "row": 6,
+      "col": 2
+    },
+    {
+      "file": "assets/textures/tiles/rock/rock_02_013.png",
+      "category": "rock",
+      "sheet": 2,
+      "index": 13,
+      "row": 6,
+      "col": 3
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_02_000.png",
+      "category": "tree",
+      "sheet": 2,
+      "index": 0,
+      "row": 0,
+      "col": 4
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_02_001.png",
+      "category": "tree",
+      "sheet": 2,
+      "index": 1,
+      "row": 0,
+      "col": 5
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_02_002.png",
+      "category": "tree",
+      "sheet": 2,
+      "index": 2,
+      "row": 1,
+      "col": 4
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_02_003.png",
+      "category": "tree",
+      "sheet": 2,
+      "index": 3,
+      "row": 1,
+      "col": 5
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_02_004.png",
+      "category": "tree",
+      "sheet": 2,
+      "index": 4,
+      "row": 2,
+      "col": 4
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_02_005.png",
+      "category": "tree",
+      "sheet": 2,
+      "index": 5,
+      "row": 2,
+      "col": 5
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_02_006.png",
+      "category": "tree",
+      "sheet": 2,
+      "index": 6,
+      "row": 3,
+      "col": 4
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_02_007.png",
+      "category": "tree",
+      "sheet": 2,
+      "index": 7,
+      "row": 3,
+      "col": 5
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_02_008.png",
+      "category": "tree",
+      "sheet": 2,
+      "index": 8,
+      "row": 4,
+      "col": 4
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_02_009.png",
+      "category": "tree",
+      "sheet": 2,
+      "index": 9,
+      "row": 4,
+      "col": 5
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_02_010.png",
+      "category": "tree",
+      "sheet": 2,
+      "index": 10,
+      "row": 5,
+      "col": 4
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_02_011.png",
+      "category": "tree",
+      "sheet": 2,
+      "index": 11,
+      "row": 5,
+      "col": 5
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_02_012.png",
+      "category": "tree",
+      "sheet": 2,
+      "index": 12,
+      "row": 6,
+      "col": 4
+    },
+    {
+      "file": "assets/textures/tiles/tree/tree_02_013.png",
+      "category": "tree",
+      "sheet": 2,
+      "index": 13,
+      "row": 6,
+      "col": 5
+    },
+    {
+      "file": "assets/textures/tiles/grass/grass_02_000.png",
+      "category": "grass",
+      "sheet": 2,
+      "index": 0,
+      "row": 0,
+      "col": 6
+    },
+    {
+      "file": "assets/textures/tiles/grass/grass_02_001.png",
+      "category": "grass",
+      "sheet": 2,
+      "index": 1,
+      "row": 0,
+      "col": 7
+    },
+    {
+      "file": "assets/textures/tiles/grass/grass_02_002.png",
+      "category": "grass",
+      "sheet": 2,
+      "index": 2,
+      "row": 1,
+      "col": 6
+    },
+    {
+      "file": "assets/textures/tiles/grass/grass_02_003.png",
+      "category": "grass",
+      "sheet": 2,
+      "index": 3,
+      "row": 1,
+      "col": 7
+    },
+    {
+      "file": "assets/textures/tiles/grass/grass_02_004.png",
+      "category": "grass",
+      "sheet": 2,
+      "index": 4,
+      "row": 2,
+      "col": 6
+    },
+    {
+      "file": "assets/textures/tiles/grass/grass_02_005.png",
+      "category": "grass",
+      "sheet": 2,
+      "index": 5,
+      "row": 2,
+      "col": 7
+    },
+    {
+      "file": "assets/textures/tiles/grass/grass_02_006.png",
+      "category": "grass",
+      "sheet": 2,
+      "index": 6,
+      "row": 3,
+      "col": 6
+    },
+    {
+      "file": "assets/textures/tiles/grass/grass_02_007.png",
+      "category": "grass",
+      "sheet": 2,
+      "index": 7,
+      "row": 3,
+      "col": 7
+    },
+    {
+      "file": "assets/textures/tiles/grass/grass_02_008.png",
+      "category": "grass",
+      "sheet": 2,
+      "index": 8,
+      "row": 4,
+      "col": 6
+    },
+    {
+      "file": "assets/textures/tiles/grass/grass_02_009.png",
+      "category": "grass",
+      "sheet": 2,
+      "index": 9,
+      "row": 4,
+      "col": 7
+    },
+    {
+      "file": "assets/textures/tiles/grass/grass_02_010.png",
+      "category": "grass",
+      "sheet": 2,
+      "index": 10,
+      "row": 5,
+      "col": 6
+    },
+    {
+      "file": "assets/textures/tiles/grass/grass_02_011.png",
+      "category": "grass",
+      "sheet": 2,
+      "index": 11,
+      "row": 5,
+      "col": 7
+    },
+    {
+      "file": "assets/textures/tiles/grass/grass_02_012.png",
+      "category": "grass",
+      "sheet": 2,
+      "index": 12,
+      "row": 6,
+      "col": 6
+    },
+    {
+      "file": "assets/textures/tiles/grass/grass_02_013.png",
+      "category": "grass",
+      "sheet": 2,
+      "index": 13,
+      "row": 6,
+      "col": 7
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_02_000.png",
+      "category": "dirt",
+      "sheet": 2,
+      "index": 0,
+      "row": 0,
+      "col": 8
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_02_001.png",
+      "category": "dirt",
+      "sheet": 2,
+      "index": 1,
+      "row": 0,
+      "col": 9
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_02_002.png",
+      "category": "dirt",
+      "sheet": 2,
+      "index": 2,
+      "row": 1,
+      "col": 8
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_02_003.png",
+      "category": "dirt",
+      "sheet": 2,
+      "index": 3,
+      "row": 1,
+      "col": 9
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_02_004.png",
+      "category": "dirt",
+      "sheet": 2,
+      "index": 4,
+      "row": 2,
+      "col": 8
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_02_005.png",
+      "category": "dirt",
+      "sheet": 2,
+      "index": 5,
+      "row": 2,
+      "col": 9
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_02_006.png",
+      "category": "dirt",
+      "sheet": 2,
+      "index": 6,
+      "row": 3,
+      "col": 8
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_02_007.png",
+      "category": "dirt",
+      "sheet": 2,
+      "index": 7,
+      "row": 3,
+      "col": 9
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_02_008.png",
+      "category": "dirt",
+      "sheet": 2,
+      "index": 8,
+      "row": 4,
+      "col": 8
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_02_009.png",
+      "category": "dirt",
+      "sheet": 2,
+      "index": 9,
+      "row": 4,
+      "col": 9
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_02_010.png",
+      "category": "dirt",
+      "sheet": 2,
+      "index": 10,
+      "row": 5,
+      "col": 8
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_02_011.png",
+      "category": "dirt",
+      "sheet": 2,
+      "index": 11,
+      "row": 5,
+      "col": 9
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_02_012.png",
+      "category": "dirt",
+      "sheet": 2,
+      "index": 12,
+      "row": 6,
+      "col": 8
+    },
+    {
+      "file": "assets/textures/tiles/dirt/dirt_02_013.png",
+      "category": "dirt",
+      "sheet": 2,
+      "index": 13,
+      "row": 6,
+      "col": 9
+    }
+  ],
+  "notes": [
+    "sheet1: 오토타일형(나무/돌산/호수/흙) 3열×7행",
+    "sheet2: 물/돌/나무오브젝트/풀/흙 2열×7행",
+    "게임 연동 전 미리보기(preview.png)로 검수"
+  ]
+}

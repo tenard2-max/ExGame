@@ -21,12 +21,14 @@ generate(worldSeed, chunkX, chunkY) -> GeneratedChunk
 ```text
 WorldGenerator
 ├─ WorldGenerationPipeline
-│  └─ Seed → Biome → Terrain → River → Forest
+│  └─ Seed → 월드좌표 타일 영역 → Terrain (청크는 샘플 창)
 └─ ContentGenerationPipeline
    └─ Ore → Dungeon → NPC → Treasure → Monster
 ```
 
 월드 지형과 콘텐츠 계약을 분리하여 광석·던전·NPC·몬스터를 추가해도 지형 생성 계약을 바꾸지 않도록 합니다.
+
+타일 영역·경계 청크·최소 연결 크기 원칙은 [`TILE_PRINCIPLES.md`](./TILE_PRINCIPLES.md)를 따릅니다. 청크는 로드 단위이며, 청크 단위로 바이옴을 통째로 칠하지 않습니다.
 
 모든 생성 단계는 `GenerationContext`로 Seed, 청크 좌표, `DeterministicRandom`을 전달받습니다. 하위 생성기는 이름이 고정된 namespace로 난수 스트림을 `fork`해야 합니다. 한 생성기에 난수 호출이 추가되어도 다른 생성기의 결과가 밀리지 않게 하기 위함입니다.
 
@@ -34,7 +36,7 @@ WorldGenerator
 
 `ChunkManager.syncAround(center)`가 플레이어의 중심 청크 변경을 처리합니다.
 
-1. 중심 주변 3×3 좌표를 계산합니다.
+1. 중심 주변 5×5 좌표를 계산합니다.
 2. 아직 없는 좌표만 로컬 변경분 조회 후 Seed로 생성합니다.
 3. 변경분을 생성 결과에 적용합니다.
 4. 범위를 벗어난 청크의 변경분 저장을 완료합니다.
@@ -79,7 +81,7 @@ finalChunk = generate(seed, x, y) + chunkDelta(x, y)
 
 - 타입·인터페이스와 스키마: 3단계 완료
 - 입력·캐릭터·카메라: 4단계 완료
-- 결정적 PRNG·지형·광석·3×3 청크 스트리밍: 5단계 완료
+- 결정적 PRNG·지형·광석·5×5 청크 스트리밍: 5단계 이후 고해상도 대응으로 확장
 - 채굴·설치와 변경분(delta) localStorage 저장: 6단계 완료
 - 광맥 채굴·자원 티어·인벤토리·핫바: 7단계 완료
 - 몬스터·보물·NPC·던전과 레벨·전투: 8단계 완료

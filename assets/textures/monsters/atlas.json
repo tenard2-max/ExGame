@@ -1,0 +1,102 @@
+{
+  "width": 1268,
+  "height": 108,
+  "frames": [
+    {
+      "name": "slime",
+      "typeId": "monster-slime",
+      "x": 0,
+      "y": 69,
+      "w": 70,
+      "h": 39
+    },
+    {
+      "name": "wolf",
+      "typeId": "monster-wolf",
+      "x": 74,
+      "y": 22,
+      "w": 102,
+      "h": 86
+    },
+    {
+      "name": "golem",
+      "typeId": "monster-golem",
+      "x": 180,
+      "y": 16,
+      "w": 102,
+      "h": 92
+    },
+    {
+      "name": "orc",
+      "typeId": "monster-orc",
+      "x": 286,
+      "y": 32,
+      "w": 86,
+      "h": 76
+    },
+    {
+      "name": "orc-warrior",
+      "typeId": "monster-orc-warrior",
+      "x": 376,
+      "y": 29,
+      "w": 102,
+      "h": 79
+    },
+    {
+      "name": "hero-orc",
+      "typeId": "monster-hero-orc",
+      "x": 482,
+      "y": 14,
+      "w": 118,
+      "h": 94
+    },
+    {
+      "name": "werewolf",
+      "typeId": "monster-werewolf",
+      "x": 604,
+      "y": 6,
+      "w": 102,
+      "h": 102
+    },
+    {
+      "name": "red-wolf",
+      "typeId": "monster-red-wolf",
+      "x": 710,
+      "y": 7,
+      "w": 102,
+      "h": 101
+    },
+    {
+      "name": "lycanthrope",
+      "typeId": "monster-lycanthrope",
+      "x": 816,
+      "y": 0,
+      "w": 118,
+      "h": 108
+    },
+    {
+      "name": "lizardman",
+      "typeId": "monster-lizardman",
+      "x": 938,
+      "y": 23,
+      "w": 102,
+      "h": 85
+    },
+    {
+      "name": "black-lizardman",
+      "typeId": "monster-black-lizardman",
+      "x": 1044,
+      "y": 28,
+      "w": 102,
+      "h": 80
+    },
+    {
+      "name": "elder-lizardman",
+      "typeId": "monster-elder-lizardman",
+      "x": 1150,
+      "y": 5,
+      "w": 118,
+      "h": 103
+    }
+  ]
+}

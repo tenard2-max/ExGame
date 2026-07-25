@@ -15,26 +15,38 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-web.ps1
 
 # 2) release/exgame-<version> 폴더와 ZIP 생성
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-release.ps1
+
+# (권장) PC ZIP + Android www 동기화까지
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-all.ps1
 ```
 
 결과물:
 
 - `release/exgame-0.1.0/` — 실행 가능한 폴더
-- `release/exgame-0.1.0.zip` — 배포용 압축 파일
+- `release/exgame-0.1.0.zip` — PC 배포용 압축 파일
+- Android APK는 [`MOBILE.md`](./MOBILE.md) 참고
 
 ## 플레이어 실행 방법
 
 1. ZIP을 풀어 `exgame-0.1.0` 폴더를 연다.
-2. `run-offline.bat`을 더블클릭한다. (Python 필요: `py` 또는 `python`)
-3. 브라우저가 `http://127.0.0.1:7456`으로 열린다.
+2. `auto-run.bat`(또는 `run-offline.bat`)을 더블클릭한다. (Python 필요: `py` 또는 `python`)
+3. 브라우저가 `http://127.0.0.1:7456/?offline=1`으로 열린다.
 4. 종료하려면 서버 창에서 `Ctrl+C`.
 
-개발 트리에서는 다음도 동일합니다.
+개발 트리에서는 더블클릭:
+
+- `game/auto-run.bat` — 아틀라스 동기화 + 서버 + 브라우저
+- `game/start-server.bat` — 서버만 (이미 실행 중이면 브라우저만)
+- 저장소 루트 `게임실행.bat` — 자동 실행과 동일
+
+또는:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-offline.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\auto-run.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-server.ps1 -ForceRestart
 ```
 
+서버가 죽은 것처럼 보이면 `start-server.bat`을 다시 실행하거나 `-ForceRestart`로 포트를 비운 뒤 재기동하세요.
 ## 오프라인 검증 체크리스트
 
 - [ ] PC의 Wi-Fi/이더넷을 끈 상태(또는 비행기 모드)에서 실행된다

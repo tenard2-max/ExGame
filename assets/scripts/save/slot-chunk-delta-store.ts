@@ -7,10 +7,22 @@ import type { ChunkDelta, SaveSlotId } from './save-types';
 
 /** SaveManager의 청크 delta API를 ChunkDeltaStore 계약에 맞춥니다. */
 export class SlotChunkDeltaStore implements ChunkDeltaStore {
+  private slotId: SaveSlotId;
+
   constructor(
     private readonly saveManager: SaveManager,
-    private readonly slotId: SaveSlotId,
-  ) {}
+    slotId: SaveSlotId,
+  ) {
+    this.slotId = slotId;
+  }
+
+  getSlotId(): SaveSlotId {
+    return this.slotId;
+  }
+
+  setSlotId(slotId: SaveSlotId): void {
+    this.slotId = slotId;
+  }
 
   load(coordinate: ChunkCoordinate): Promise<ChunkDelta | null> {
     return this.saveManager.loadChunkDelta(this.slotId, coordinate);

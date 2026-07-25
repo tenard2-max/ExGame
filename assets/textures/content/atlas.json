@@ -1,0 +1,38 @@
+{
+  "width": 148,
+  "height": 36,
+  "frames": [
+    {
+      "name": "coal",
+      "typeId": "ore-coal",
+      "x": 0,
+      "y": 0,
+      "w": 35,
+      "h": 36
+    },
+    {
+      "name": "ark",
+      "typeId": "ore-ark",
+      "x": 37,
+      "y": 0,
+      "w": 35,
+      "h": 36
+    },
+    {
+      "name": "iron",
+      "typeId": "ore-iron",
+      "x": 74,
+      "y": 2,
+      "w": 36,
+      "h": 34
+    },
+    {
+      "name": "treasure",
+      "typeId": "treasure-chest",
+      "x": 112,
+      "y": 6,
+      "w": 36,
+      "h": 30
+    }
+  ]
+}

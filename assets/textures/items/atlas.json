@@ -1,0 +1,54 @@
+{
+  "width": 303,
+  "height": 48,
+  "frames": [
+    {
+      "name": "weapon-iron-sword",
+      "itemId": "weapon-iron-sword",
+      "x": 0,
+      "y": 0,
+      "w": 48,
+      "h": 48
+    },
+    {
+      "name": "weapon-mithril-sword",
+      "itemId": "weapon-mithril-sword",
+      "x": 52,
+      "y": 0,
+      "w": 45,
+      "h": 48
+    },
+    {
+      "name": "weapon-orichalcum-sword",
+      "itemId": "weapon-orichalcum-sword",
+      "x": 101,
+      "y": 0,
+      "w": 46,
+      "h": 48
+    },
+    {
+      "name": "armor-leather",
+      "itemId": "armor-leather",
+      "x": 151,
+      "y": 3,
+      "w": 48,
+      "h": 45
+    },
+    {
+      "name": "armor-chain",
+      "itemId": "armor-chain",
+      "x": 203,
+      "y": 10,
+      "w": 48,
+      "h": 38
+    },
+    {
+      "name": "armor-plate",
+      "itemId": "armor-plate",
+      "x": 255,
+      "y": 9,
+      "w": 48,
+      "h": 39
+    }
+  ]
+}

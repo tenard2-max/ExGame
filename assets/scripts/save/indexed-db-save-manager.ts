@@ -175,6 +175,25 @@ export class IndexedDbSaveManager implements SaveManager {
     return this.loadSlot(slotId) as Promise<SaveGame>;
   }
 
+  /**
+   * 청크 변경분을 지우고 플레이어·월드 시드를 교체합니다(새로 시작).
+   */
+  async resetSlotProgress(input: {
+    readonly slotId: SaveSlotId;
+    readonly worldSeed: WorldSeed;
+    readonly initialPlayer: PlayerState;
+  }): Promise<SaveGame> {
+    await this.clearDeltas(input.slotId);
+    const now = new Date().toISOString();
+    await this.createOrReplaceSlot({
+      slotId: input.slotId,
+      worldSeed: input.worldSeed,
+      initialPlayer: input.initialPlayer,
+      createdAtIso: now,
+    });
+    return this.loadSlot(input.slotId) as Promise<SaveGame>;
+  }
+
   private async clearDeltas(slotId: SaveSlotId): Promise<void> {
     const database = await this.openDatabase();
     const records = await requestToPromise<StoredDeltaRecord[]>(

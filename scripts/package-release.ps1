@@ -26,8 +26,18 @@ New-Item -ItemType Directory -Path $packagePath | Out-Null
 
 # -LiteralPath는 와일드카드를 확장하지 않으므로 Get-ChildItem으로 복사합니다.
 Get-ChildItem -LiteralPath $sourcePath | Copy-Item -Destination $packagePath -Recurse -Force
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot "run-offline.ps1") -Destination $packagePath -Force
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot "run-offline.bat") -Destination $packagePath -Force
+$launcherScripts = @(
+    "run-offline.ps1", "run-offline.bat",
+    "start-server.ps1", "start-server.bat",
+    "auto-run.ps1", "auto-run.bat",
+    "sync-runtime-atlases.ps1"
+)
+foreach ($name in $launcherScripts) {
+    $src = Join-Path $PSScriptRoot $name
+    if (Test-Path -LiteralPath $src) {
+        Copy-Item -LiteralPath $src -Destination $packagePath -Force
+    }
+}
 Copy-Item -LiteralPath (Join-Path $projectPath "docs\OFFLINE.md") -Destination (Join-Path $packagePath "OFFLINE.md") -Force
 
 if (-not (Test-Path -LiteralPath (Join-Path $packagePath "index.html"))) {
@@ -43,4 +53,4 @@ Compress-Archive -Path $packagePath -DestinationPath $zipPath -Force
 Write-Host "배포 패키지 생성 완료:"
 Write-Host "  폴더: $packagePath"
 Write-Host "  ZIP : $zipPath"
-Write-Host "실행: $packagePath\run-offline.bat"
+Write-Host "실행: $packagePath\auto-run.bat (또는 run-offline.bat)"

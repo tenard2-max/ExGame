@@ -1,4 +1,4 @@
-import { Node, Rect } from 'cc';
+import { Color, Graphics, Layers, Node, Rect, UITransform } from 'cc';
 
 import {
   CHUNK_MEMORY_RADIUS,
@@ -7,17 +7,42 @@ import {
 } from '../core/schema';
 import type { GeneratedContent } from '../content/content-types';
 import type { BlockDelta, ChunkDelta } from '../save/save-types';
-import { getGroundBlockId, isSolidBlock } from './block-registry';
-import type {
-  ChunkManager,
-  ChunkTransition,
-  LoadedChunk,
-} from './chunk-manager';
+import { isSolidBlock } from './block-registry';
 import {
   CHUNK_SIZE_PIXELS,
   TILE_SIZE_PIXELS,
   type ChunkRenderer,
 } from './chunk-renderer';
+import {
+  BLACKSMITH_FOOTPRINT_H,
+  BLACKSMITH_FOOTPRINT_W,
+  BLACKSMITH_TYPE_ID,
+} from '../npc/blacksmith-config';
+import {
+  MERCHANT_FOOTPRINT_H,
+  MERCHANT_FOOTPRINT_W,
+  MERCHANT_TYPE_ID,
+} from '../npc/merchant-config';
+import {
+  BANKER_FOOTPRINT_H,
+  BANKER_FOOTPRINT_W,
+  BANKER_TYPE_ID,
+} from '../npc/banker-config';
+import {
+  TELEPORTER_FOOTPRINT_H,
+  TELEPORTER_FOOTPRINT_W,
+  TELEPORTER_TYPE_ID,
+} from '../npc/teleporter-config';
+import {
+  entityVisualNodeName,
+  playNodeHitShake,
+} from './hit-shake';
+import { sampleGroundBlockAt } from './tile-region-field';
+import type {
+  ChunkManager,
+  ChunkTransition,
+  LoadedChunk,
+} from './chunk-manager';
 import type { WorldGenerator } from './generation-contracts';
 import type {
   BlockId,
@@ -49,14 +74,26 @@ export interface WorldTileCoordinate {
 export class RuntimeChunkManager implements ChunkManager {
   private readonly loadedChunks = new Map<ChunkKey, RuntimeChunk>();
   private solidColliders: ReadonlyArray<Rect> = [];
+  private worldSeed: WorldSeed;
 
   constructor(
     private readonly worldRoot: Node,
-    private readonly worldSeed: WorldSeed,
+    worldSeed: WorldSeed,
     private readonly generator: WorldGenerator,
     private readonly renderer: ChunkRenderer,
     private readonly deltaStore: ChunkDeltaStore,
-  ) {}
+  ) {
+    this.worldSeed = worldSeed;
+  }
+
+  getWorldSeed(): WorldSeed {
+    return this.worldSeed;
+  }
+
+  /** 새로 시작 시 월드 시드를 바꿉니다. 호출 전에 청크를 모두 언로드하세요. */
+  setWorldSeed(worldSeed: WorldSeed): void {
+    this.worldSeed = worldSeed;
+  }
 
   async syncAround(center: ChunkCoordinate): Promise<ChunkTransition> {
     const desired = this.createDesiredCoordinates(center);
@@ -73,7 +110,9 @@ export class RuntimeChunkManager implements ChunkManager {
         this.worldSeed,
         coordinate,
       );
-      const node = this.renderer.createNode(mergeChunkWithDelta(base, delta));
+      const node = this.renderer.createNode(
+        mergeChunkWithDelta(base, delta, this.worldSeed),
+      );
       this.worldRoot.addChild(node);
       this.loadedChunks.set(key, { base, delta, node });
       loaded.push(key);
@@ -127,7 +166,7 @@ export class RuntimeChunkManager implements ChunkManager {
     );
     if (override) {
       return override.blockId
-        ?? getGroundBlockId(chunk.base.terrain.biomeId);
+        ?? sampleGroundBlockAt(this.worldSeed, tile.x, tile.y);
     }
     return findBaseBlockId(chunk.base, local);
   }
@@ -140,11 +179,291 @@ export class RuntimeChunkManager implements ChunkManager {
     if (!chunk) return [];
 
     const local = toLocalTile(tile);
-    const effective = mergeChunkWithDelta(chunk.base, chunk.delta);
+    const effective = mergeChunkWithDelta(
+      chunk.base,
+      chunk.delta,
+      this.worldSeed,
+    );
     return effective.content.entries.filter(
       (entry) => entry.coordinate.x === local.x
         && entry.coordinate.y === local.y,
     );
+  }
+
+  /** 엔티티 스프라이트 노드를 찾아 흔들립니다. 없으면 false. */
+  shakeEntityVisual(entityId: EntityId): boolean {
+    for (const chunk of this.loadedChunks.values()) {
+      const visual = chunk.node.getChildByName(entityVisualNodeName(entityId));
+      if (!visual) continue;
+      const tagged = visual as Node & {
+        __hitRest?: { x: number; y: number };
+      };
+      if (!tagged.__hitRest) {
+        tagged.__hitRest = { x: visual.position.x, y: visual.position.y };
+      }
+      playNodeHitShake(visual, tagged.__hitRest.x, tagged.__hitRest.y);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * 타일(나무·돌 등 베이크된 지형) 히트 피드백입니다.
+   * 전용 스프라이트가 없으면 짧은 하이라이트 노드를 만들어 흔듭니다.
+   */
+  shakeWorldTile(tile: WorldTileCoordinate): void {
+    const chunk = this.getRuntimeChunkAt(tile);
+    if (!chunk) return;
+
+    const local = toLocalTile(tile);
+    const restX = (local.x + 0.5) * TILE_SIZE_PIXELS;
+    const restY = (local.y + 0.5) * TILE_SIZE_PIXELS;
+    const feedbackName = `hit-fx:${local.x},${local.y}`;
+    let feedback = chunk.node.getChildByName(feedbackName);
+    if (!feedback) {
+      feedback = new Node(feedbackName);
+      feedback.layer = Layers.Enum.UI_2D;
+      chunk.node.addChild(feedback);
+      feedback.addComponent(UITransform).setContentSize(
+        TILE_SIZE_PIXELS,
+        TILE_SIZE_PIXELS,
+      );
+      const graphics = feedback.addComponent(Graphics);
+      graphics.fillColor = new Color(255, 255, 255, 90);
+      graphics.rect(
+        -TILE_SIZE_PIXELS / 2,
+        -TILE_SIZE_PIXELS / 2,
+        TILE_SIZE_PIXELS,
+        TILE_SIZE_PIXELS,
+      );
+      graphics.fill();
+    }
+    feedback.setPosition(restX, restY, 0);
+    playNodeHitShake(feedback, restX, restY);
+  }
+
+  /**
+   * 월드 픽셀이 몬스터 스프라이트 발자국(AABB) 안에 있으면 그 몬스터를 반환합니다.
+   * 시각적으로 큰 몬스터를 타일 1칸이 아닌 이미지 영역으로 인식하기 위함입니다.
+   */
+  findMonsterAtWorldPixel(
+    worldPixelX: number,
+    worldPixelY: number,
+    getDisplaySize: (
+      typeId: string,
+    ) => { width: number; height: number } | null,
+  ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
+    let best: {
+      entity: GeneratedContent;
+      tile: WorldTileCoordinate;
+      area: number;
+    } | null = null;
+
+    for (const chunk of this.loadedChunks.values()) {
+      const effective = mergeChunkWithDelta(
+        chunk.base,
+        chunk.delta,
+        this.worldSeed,
+      );
+      const originTileX = chunk.base.coordinate.x * CHUNK_SIZE_TILES;
+      const originTileY = chunk.base.coordinate.y * CHUNK_SIZE_TILES;
+
+      for (const entry of effective.content.entries) {
+        if (!entry.typeId.startsWith('monster-')) continue;
+        const size = getDisplaySize(entry.typeId);
+        if (!size) continue;
+
+        const centerX = (originTileX + entry.coordinate.x + 0.5)
+          * TILE_SIZE_PIXELS;
+        const centerY = (originTileY + entry.coordinate.y + 0.5)
+          * TILE_SIZE_PIXELS;
+        // 스프라이트와 동일한 AABB (+4px 여유) — 커서 아래 바닥 타일보다 우선합니다.
+        const pad = 4;
+        const halfW = size.width / 2 + pad;
+        const halfH = size.height / 2 + pad;
+        if (
+          worldPixelX < centerX - halfW
+          || worldPixelX > centerX + halfW
+          || worldPixelY < centerY - halfH
+          || worldPixelY > centerY + halfH
+        ) {
+          continue;
+        }
+
+        const area = size.width * size.height;
+        if (!best || area < best.area) {
+          best = {
+            entity: entry,
+            tile: {
+              x: originTileX + entry.coordinate.x,
+              y: originTileY + entry.coordinate.y,
+            },
+            area,
+          };
+        }
+      }
+    }
+
+    return best
+      ? { entity: best.entity, tile: best.tile }
+      : null;
+  }
+
+  /**
+   * 대장장이·텔레포터 등 대형 NPC 스프라이트 AABB 히트 테스트입니다.
+   */
+  findNpcAtWorldPixel(
+    worldPixelX: number,
+    worldPixelY: number,
+    typeId: string,
+    footprintW: number,
+    footprintH: number,
+  ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
+    const halfW = (footprintW * TILE_SIZE_PIXELS) / 2 + 4;
+    const halfH = (footprintH * TILE_SIZE_PIXELS) / 2 + 4;
+
+    for (const chunk of this.loadedChunks.values()) {
+      const effective = mergeChunkWithDelta(
+        chunk.base,
+        chunk.delta,
+        this.worldSeed,
+      );
+      const originTileX = chunk.base.coordinate.x * CHUNK_SIZE_TILES;
+      const originTileY = chunk.base.coordinate.y * CHUNK_SIZE_TILES;
+
+      for (const entry of effective.content.entries) {
+        if (entry.typeId !== typeId) continue;
+        const centerX = (originTileX + entry.coordinate.x + 0.5)
+          * TILE_SIZE_PIXELS;
+        const centerY = (originTileY + entry.coordinate.y + 0.5)
+          * TILE_SIZE_PIXELS;
+        if (
+          worldPixelX < centerX - halfW
+          || worldPixelX > centerX + halfW
+          || worldPixelY < centerY - halfH
+          || worldPixelY > centerY + halfH
+        ) {
+          continue;
+        }
+        return {
+          entity: entry,
+          tile: {
+            x: originTileX + entry.coordinate.x,
+            y: originTileY + entry.coordinate.y,
+          },
+        };
+      }
+    }
+    return null;
+  }
+
+  findBlacksmithAtWorldPixel(
+    worldPixelX: number,
+    worldPixelY: number,
+  ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
+    return this.findNpcAtWorldPixel(
+      worldPixelX,
+      worldPixelY,
+      BLACKSMITH_TYPE_ID,
+      BLACKSMITH_FOOTPRINT_W,
+      BLACKSMITH_FOOTPRINT_H,
+    );
+  }
+
+  findTeleporterAtWorldPixel(
+    worldPixelX: number,
+    worldPixelY: number,
+  ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
+    return this.findNpcAtWorldPixel(
+      worldPixelX,
+      worldPixelY,
+      TELEPORTER_TYPE_ID,
+      TELEPORTER_FOOTPRINT_W,
+      TELEPORTER_FOOTPRINT_H,
+    );
+  }
+
+  findMerchantAtWorldPixel(
+    worldPixelX: number,
+    worldPixelY: number,
+  ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
+    return this.findNpcAtWorldPixel(
+      worldPixelX,
+      worldPixelY,
+      MERCHANT_TYPE_ID,
+      MERCHANT_FOOTPRINT_W,
+      MERCHANT_FOOTPRINT_H,
+    );
+  }
+
+  findBankerAtWorldPixel(
+    worldPixelX: number,
+    worldPixelY: number,
+  ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
+    return this.findNpcAtWorldPixel(
+      worldPixelX,
+      worldPixelY,
+      BANKER_TYPE_ID,
+      BANKER_FOOTPRINT_W,
+      BANKER_FOOTPRINT_H,
+    );
+  }
+
+  /**
+   * 광석·나무·돌 등 채집 대상을 타일 전체 AABB로 집습니다.
+   * 포인터 Y가 타일 상단에서 어긋나도 잡히도록 주변 타일을 검사하고
+   * 클릭에 가장 가까운 타일 중심을 고릅니다.
+   */
+  findHarvestableTileAtWorldPixel(
+    worldPixelX: number,
+    worldPixelY: number,
+    isHarvestableBlock: (blockId: string) => boolean,
+    isHarvestableContent: (typeId: string) => boolean,
+  ): WorldTileCoordinate | null {
+    const baseTileX = Math.floor(worldPixelX / TILE_SIZE_PIXELS);
+    const baseTileY = Math.floor(worldPixelY / TILE_SIZE_PIXELS);
+    let best: { tile: WorldTileCoordinate; distSq: number } | null = null;
+    // 타일 상·하단 클릭 시 floor 오차를 흡수할 여유
+    const searchRadius = 2;
+    const half = TILE_SIZE_PIXELS / 2 + TILE_SIZE_PIXELS / 2;
+
+    for (let oy = -searchRadius; oy <= searchRadius; oy += 1) {
+      for (let ox = -searchRadius; ox <= searchRadius; ox += 1) {
+        const tile = { x: baseTileX + ox, y: baseTileY + oy };
+        if (!this.isTileHarvestable(tile, isHarvestableBlock, isHarvestableContent)) {
+          continue;
+        }
+        const centerX = (tile.x + 0.5) * TILE_SIZE_PIXELS;
+        const centerY = (tile.y + 0.5) * TILE_SIZE_PIXELS;
+        if (
+          worldPixelX < centerX - half
+          || worldPixelX > centerX + half
+          || worldPixelY < centerY - half
+          || worldPixelY > centerY + half
+        ) {
+          continue;
+        }
+        const dx = worldPixelX - centerX;
+        const dy = worldPixelY - centerY;
+        const distSq = dx * dx + dy * dy;
+        if (!best || distSq < best.distSq) {
+          best = { tile, distSq };
+        }
+      }
+    }
+    return best?.tile ?? null;
+  }
+
+  private isTileHarvestable(
+    tile: WorldTileCoordinate,
+    isHarvestableBlock: (blockId: string) => boolean,
+    isHarvestableContent: (typeId: string) => boolean,
+  ): boolean {
+    for (const entity of this.getContentEntitiesAt(tile)) {
+      if (isHarvestableContent(entity.typeId)) return true;
+    }
+    const blockId = this.getEffectiveBlockId(tile);
+    return blockId !== null && isHarvestableBlock(blockId);
   }
 
   /** 생성된 엔티티(광맥 등) 제거를 delta에 기록하고 저장·재렌더링합니다. */
@@ -208,7 +527,7 @@ export class RuntimeChunkManager implements ChunkManager {
     const parent = chunk.node.parent ?? this.worldRoot;
     chunk.node.destroy();
     chunk.node = this.renderer.createNode(
-      mergeChunkWithDelta(chunk.base, chunk.delta),
+      mergeChunkWithDelta(chunk.base, chunk.delta, this.worldSeed),
     );
     parent.addChild(chunk.node);
     this.rebuildSolidColliders();
@@ -257,7 +576,11 @@ export class RuntimeChunkManager implements ChunkManager {
   private rebuildSolidColliders(): void {
     const colliders: Rect[] = [];
     for (const chunk of this.loadedChunks.values()) {
-      const effective = mergeChunkWithDelta(chunk.base, chunk.delta);
+      const effective = mergeChunkWithDelta(
+        chunk.base,
+        chunk.delta,
+        this.worldSeed,
+      );
       const chunkOriginX = chunk.base.coordinate.x * CHUNK_SIZE_PIXELS;
       const chunkOriginY = chunk.base.coordinate.y * CHUNK_SIZE_PIXELS;
       for (const block of effective.terrain.blocks) {
@@ -299,6 +622,7 @@ function findBaseBlockId(
 export function mergeChunkWithDelta(
   base: GeneratedChunk,
   delta: ChunkDelta | null,
+  worldSeed: WorldSeed,
 ): GeneratedChunk {
   if (!delta || (
     delta.blocks.length === 0
@@ -314,13 +638,20 @@ export function mergeChunkWithDelta(
       block.blockId,
     ]),
   );
-  const groundBlockId = getGroundBlockId(base.terrain.biomeId);
+  const chunkOriginX = base.coordinate.x * CHUNK_SIZE_TILES;
+  const chunkOriginY = base.coordinate.y * CHUNK_SIZE_TILES;
   const blocks = base.terrain.blocks.map((block) => {
     const key = `${block.coordinate.x},${block.coordinate.y}`;
     if (!overrides.has(key)) return block;
+    const override = overrides.get(key);
+    const groundBlockId = sampleGroundBlockAt(
+      worldSeed,
+      chunkOriginX + block.coordinate.x,
+      chunkOriginY + block.coordinate.y,
+    );
     return {
       coordinate: block.coordinate,
-      blockId: overrides.get(key) ?? groundBlockId,
+      blockId: override ?? groundBlockId,
     };
   });
 

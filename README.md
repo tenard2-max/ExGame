@@ -8,7 +8,7 @@ ExGame의 독립 Cocos Creator 클라이언트입니다. 기존 NovelExplor 웹�
 - TypeScript (`strict: true`)
 - 2D 프로젝트
 - Web Desktop(WebGL) 우선
-- 기준 해상도 **1280×720**, 가로형
+- 기준 해상도 **2560×1440**, 가로형
 
 ## 프로젝트 열기
 
@@ -35,55 +35,90 @@ Windows 명령줄 빌드:
 출력은 `build/web-desktop/`에 생성되며 Git에는 포함하지 않습니다.
 빌드 설정은 `build-config/web-desktop.json`에 고정되어 있습니다.
 
+## PC ZIP + Android APK 한 번에
+
+```powershell
+.\scripts\package-all.ps1
+```
+
+- PC: `release/exgame-<version>.zip`
+- 폰: 웹 빌드를 `mobile/android/.../assets/www`에 동기화 후, Android Studio(또는 gradlew)로 APK
+
+상세: [`docs/MOBILE.md`](./docs/MOBILE.md) · [`docs/RELEASE.md`](./docs/RELEASE.md)
+
 ## 오프라인 실행 (권장)
+
+더블클릭:
+
+| 파일 | 역할 |
+|------|------|
+| `ExGame.lnk` | 아이콘 바로가기 (없으면 `create-shortcut.bat`) |
+| `auto-run.bat` | 아틀라스 동기화 → 서버 기동 → 브라우저 자동 실행 |
+| `start-server.bat` | 로컬 서버만 기동 (이미 떠 있으면 브라우저만 염) |
+| `create-shortcut.bat` | 바탕화면·폴더에 아이콘 바로가기 생성 |
+| 저장소 루트 `게임실행.bat` | 자동 실행과 동일 |
+
+아이콘 원본: `branding/exgame-icon-source.png` · Windows 아이콘: `branding/exgame.ico`
+
+PowerShell:
 
 ```powershell
 # Web 빌드 후 배포 패키지 생성
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-web.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\package-release.ps1
 
-# 또는 개발 빌드를 바로 오프라인 실행
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-offline.ps1
+# 자동 실행 (권장)
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\auto-run.ps1
+
+# 서버만 / 강제 재기동
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-server.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-server.ps1 -ForceRestart
 ```
 
-배포 ZIP을 받은 경우에는 폴더 안의 `run-offline.bat`을 더블클릭하면 됩니다.  
+배포 ZIP을 받은 경우에는 폴더 안의 `auto-run.bat`(또는 `run-offline.bat`)을 더블클릭하면 됩니다.  
 자세한 내용은 [`docs/OFFLINE.md`](./docs/OFFLINE.md)를 참고하세요.
 
 ## 로컬 실행
 
-Web 빌드 결과는 `file://`로 직접 열지 않습니다. 빌드 폴더에서 정적 서버를 실행합니다.
+Web 빌드 결과는 `file://`로 직접 열지 않습니다. `auto-run.bat` / `start-server.bat`을 쓰거나:
 
 ```powershell
 py -m http.server 7456 --directory .\build\web-desktop
 ```
 
-브라우저에서 `http://127.0.0.1:7456`을 엽니다.
+브라우저에서 `http://127.0.0.1:7456/?offline=1`을 엽니다.
 
 ## 현재 조작
 
 - 키보드: `WASD` 또는 방향키
 - 마우스: 왼쪽 버튼을 누른 채 이동할 방향으로 드래그
 - 터치: 화면을 누른 채 이동할 방향으로 드래그
-- 채굴: 가까운 블록·광맥을 짧게 탭(클릭) — 바위 2회, 나무 1회, 석탄 1회, 철 2회, 아크 3회
+- 채집: 나무·바위·광석에 가까이 서서 **길게 누름**(이동하지 않음) — 진행 바 후 획득
 - 설치: 빈 바닥을 짧게 탭 — 핫바에서 선택한 아이템(돌) 1개 소비
 - 핫바: 숫자 키 `1`~`5` 또는 슬롯 터치/클릭으로 선택
-- 전투: 몬스터를 탭해 공격 — 처치 시 경험치·드롭, 반격당하면 체력 감소
-- 상호작용: 보물 상자·던전 입구는 탭으로 개봉, 주민(NPC)은 대화
-- 저장: `S` 수동 저장, `L` 불러오기, `E` JSON 내보내기, `I` JSON 가져오기
+- 전투: 몬스터를 짧게 탭 — 처치 시 경험치·드롭
+- 상호작용: 보물 상자·던전 입구·주민(NPC)은 짧게 탭
+- 설정(톱니): 좌상단 — 나무/돌 채집 시간, 몹(슬라임·늑대·골렘) 타격치 조정 (브라우저에 저장)
+- 저장: `Ctrl+S` 저장, `Ctrl+L` 불러오기(슬롯 목록), `Ctrl+E` 내보내기(파일명 지정), `Ctrl+N` 새로 시작(캐릭터 선택)
 - 자동 저장: 20초 간격 + 창 종료 직전 시도
+- 상태: 좌상단에 **레벨**·HP·ATK·XP 표시
+- 포션: `E` 메뉴, `ESC`로 닫기
+- 인벤토리: `I` 창, `ESC`로 닫기
+- 불러오기 목록: 세이브 1~30 + 원본세이브파일로드(파일 선택), 휠/방향키 스크롤, `ESC`로 닫기
+- 새로 시작: 캐릭터 24종 초상화 선택 후 인게임 스프라이트로 시작
 
 마우스와 터치는 같은 포인터 입력을 사용하며 hover에 의존하지 않습니다.
-드래그는 이동, 짧은 탭은 채굴·설치로 구분됩니다.
+길게 누름은 채집, 짧은 탭은 전투·설치·상호작용으로 구분됩니다.
 
 ## 현재 월드
 
 - 기본 Seed: `851294`
 - 청크: 16×16 타일, 타일당 32px
-- 플레이어 중심 3×3 청크만 생성·유지
-- 지형: Biome → Terrain → River → Forest
+- 플레이어 중심 5×5 청크만 생성·유지 (고해상도 맞춤)
+- 지형: 월드 좌표 타일 영역(유기적 곡선) → 청크는 샘플 창 ([`docs/TILE_PRINCIPLES.md`](./docs/TILE_PRINCIPLES.md))
 - 콘텐츠: 광석(석탄·철·아크) → 던전 → NPC → 보물 → 몬스터 순서로 생성
 - 몬스터 티어(슬라임·늑대·골렘)는 원점에서 먼 청크일수록 상향
-- 나무와 바위는 이동 충돌 대상으로 처리
+- 나무와 바위는 영역으로 군집하며 이동 충돌 대상
 - 플레이어 상태와 변경분(delta)은 IndexedDB에 저장, 원본 지형은 Seed로 재계산
 - 세이브 포맷: [`docs/SAVE_FORMAT.md`](./docs/SAVE_FORMAT.md)
 - 성능·호환성: [`docs/PERFORMANCE.md`](./docs/PERFORMANCE.md)

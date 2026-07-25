@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- GitHub Releases 자동 업데이트 대상. publish 스크립트/수동으로 맞춥니다. -->
+    <string name="github_owner" translatable="false">tenard2</string>
+    <string name="github_repo" translatable="false">ExGame</string>
+    <string name="update_checking">업데이트 확인 중…</string>
+    <string name="update_downloading">게임 데이터 다운로드 중…</string>
+    <string name="update_applying">업데이트 적용 중…</string>
+    <string name="update_ready">최신 버전으로 시작합니다</string>
+    <string name="update_failed_offline">오프라인 — 내장 버전으로 실행</string>
+</resources>

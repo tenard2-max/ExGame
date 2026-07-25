@@ -1,0 +1,31 @@
+{
+  "width": 152,
+  "height": 52,
+  "tileSize": 48,
+  "frames": [
+    {
+      "name": "potion-basic",
+      "typeId": "potion-basic",
+      "x": 2,
+      "y": 2,
+      "w": 48,
+      "h": 48
+    },
+    {
+      "name": "potion-mid",
+      "typeId": "potion-mid",
+      "x": 52,
+      "y": 2,
+      "w": 48,
+      "h": 48
+    },
+    {
+      "name": "potion-high",
+      "typeId": "potion-high",
+      "x": 102,
+      "y": 2,
+      "w": 48,
+      "h": 48
+    }
+  ]
+}

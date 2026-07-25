@@ -7,6 +7,13 @@
 /native/
 /profiles/
 
+# Android / mobile
+/mobile/android/app/build/
+/mobile/android/.gradle/
+/mobile/android/local.properties
+/mobile/android/app/src/main/assets/www/*
+!/mobile/android/app/src/main/assets/www/README.txt
+
 # Dependencies
 /node_modules/
 
@@ -15,3 +22,10 @@
 /.idea/
 .DS_Store
 Thumbs.db
+
+# Local tooling / junk
+/tools/
+/scripts/__pycache__/
+*.lnk
+ExGame.lnk
+temp-*.txt

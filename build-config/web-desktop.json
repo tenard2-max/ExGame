@@ -9,8 +9,8 @@
     "web-desktop": {
       "useWebGPU": false,
       "resolution": {
-        "designWidth": 1280,
-        "designHeight": 720
+        "designWidth": 2560,
+        "designHeight": 1440
       }
     }
   }

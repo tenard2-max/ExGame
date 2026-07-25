@@ -37,6 +37,10 @@ export class PlayerController extends Component {
     this.moveSpeed = moveSpeed;
   }
 
+  setMoveSpeed(moveSpeed: number): void {
+    this.moveSpeed = moveSpeed;
+  }
+
   getAnimationState(): PlayerAnimationState {
     return this.animationState;
   }

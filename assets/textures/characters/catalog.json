@@ -1,0 +1,292 @@
+{
+  "characters": [
+    {
+      "id": "rainbow_sword",
+      "name": "무지개 검사",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 112,
+        "height": 166
+      }
+    },
+    {
+      "id": "pink_rogue",
+      "name": "핑크 도적",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 114,
+        "height": 166
+      }
+    },
+    {
+      "id": "jade_mage",
+      "name": "비취 마법사",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 95,
+        "height": 166
+      }
+    },
+    {
+      "id": "turquoise_priest",
+      "name": "청록 사제",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 117,
+        "height": 166
+      }
+    },
+    {
+      "id": "silver_noble",
+      "name": "은빛 귀족",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 118,
+        "height": 166
+      }
+    },
+    {
+      "id": "jade_staff",
+      "name": "비취 지팡이",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 109,
+        "height": 166
+      }
+    },
+    {
+      "id": "blossom_mage",
+      "name": "벚꽃 무녀",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 133,
+        "height": 166
+      }
+    },
+    {
+      "id": "gold_warrior",
+      "name": "황금 전사",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 118,
+        "height": 166
+      }
+    },
+    {
+      "id": "forest_axe",
+      "name": "숲의 도끼전사",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 138,
+        "height": 166
+      }
+    },
+    {
+      "id": "crimson_knight",
+      "name": "홍안 기사",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 158,
+        "height": 166
+      }
+    },
+    {
+      "id": "scarlet_elf",
+      "name": "진홍 엘프",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 140,
+        "height": 166
+      }
+    },
+    {
+      "id": "aurora_mage",
+      "name": "오로라 마법사",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 116,
+        "height": 166
+      }
+    },
+    {
+      "id": "crimson_whip",
+      "name": "진홍 채찍",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 112,
+        "height": 166
+      }
+    },
+    {
+      "id": "scarlet_gunner",
+      "name": "진홍 건슬링어",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 118,
+        "height": 166
+      }
+    },
+    {
+      "id": "pink_halberd",
+      "name": "분홍 극창",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 101,
+        "height": 166
+      }
+    },
+    {
+      "id": "ruby_glaive",
+      "name": "루비 창기사",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 93,
+        "height": 166
+      }
+    },
+    {
+      "id": "peach_archer",
+      "name": "복숭아 궁수",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 113,
+        "height": 166
+      }
+    },
+    {
+      "id": "rose_archer",
+      "name": "장미 궁수",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 113,
+        "height": 166
+      }
+    },
+    {
+      "id": "golden_sniper",
+      "name": "황금 저격수",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 110,
+        "height": 166
+      }
+    },
+    {
+      "id": "lotus_archer",
+      "name": "연꽃 궁수",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 98,
+        "height": 166
+      }
+    },
+    {
+      "id": "holy_grimoire",
+      "name": "성서의 사제",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 125,
+        "height": 166
+      }
+    },
+    {
+      "id": "crimson_bow",
+      "name": "진홍 은궁",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 172,
+        "height": 166
+      }
+    },
+    {
+      "id": "orange_grimoire",
+      "name": "주황 마도서",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 72,
+        "height": 166
+      }
+    },
+    {
+      "id": "lavender_fencer",
+      "name": "라벤더 펜서",
+      "portrait": {
+        "width": 682,
+        "height": 1024
+      },
+      "play": {
+        "width": 81,
+        "height": 166
+      }
+    }
+  ]
+}

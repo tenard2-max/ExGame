@@ -1,5 +1,6 @@
 import {
   _decorator,
+  Camera,
   Color,
   Component,
   Graphics,
@@ -8,6 +9,7 @@ import {
   Node,
   UITransform,
   Vec2,
+  Vec3,
 } from 'cc';
 
 import type { GameBalanceSettings } from '../core/game-balance-settings';
@@ -53,12 +55,15 @@ import type {
 import type { WorldSeed } from '../world/world-types';
 import {
   isUiLocationOverHud,
-  uiLocationToWorldLocal,
 } from '../ui/hud-layout';
+import type { WorldHitDebugOverlay } from '../ui/world-hit-debug-overlay';
+import {
+  screenToWorldPoint,
+  type UiBounds,
+} from '../world/world-ui-hit';
 import type { TooltipHud } from '../ui/tooltip-hud';
 import type { PlayerStatsModel } from './player-stats-model';
 import { PlayerVisualMotion } from './player-visual-motion';
-
 const { ccclass } = _decorator;
 
 /** 플레이어 중심에서 상호작용할 수 있는 기본 최대 거리(타일→px). */
@@ -107,7 +112,11 @@ interface HarvestTarget {
 @ccclass('BlockInteractionController')
 export class BlockInteractionController extends Component {
   private readonly tapLocation = new Vec2();
+  private readonly tapScreen = new Vec2();
   private readonly hoverLocation = new Vec2();
+  private readonly hoverScreen = new Vec2();
+  private readonly worldHitPoint = new Vec2();
+  private readonly worldHitTmp = new Vec3();
   /** 몬스터·채굴 대상별 남은 체력입니다. 세션 내에서만 유지됩니다. */
   private readonly targetHealth = new Map<string, number>();
 
@@ -137,6 +146,11 @@ export class BlockInteractionController extends Component {
   private gears: GearInstanceStore | null = null;
   /** 몬스터 타격 후 남은 공격 쿨타임(초). */
   private attackCooldownRemaining = 0;
+  private hitDebug: WorldHitDebugOverlay | null = null;
+
+  setHitDebugOverlay(overlay: WorldHitDebugOverlay | null): void {
+    this.hitDebug = overlay;
+  }
 
   configure(
     inputSource: UnifiedInput,
@@ -266,17 +280,25 @@ export class BlockInteractionController extends Component {
     if (!tooltip) return;
 
     if (
-      !this.inputSource!.getHoverLocation(this.hoverLocation)
+      !this.inputSource!.getHoverLocation(this.hoverLocation, this.hoverScreen)
       || isUiLocationOverHud(this.hoverLocation.x, this.hoverLocation.y)
     ) {
       tooltip.hide();
+      this.flushHitDebug(null);
       return;
     }
 
-    const monsterHit = this.findMonsterAtUi(this.hoverLocation);
+    this.debugBoundsBuffer = [];
+    const worldPoint = this.screenToWorldHit(this.hoverScreen);
+    const monsterHit = worldPoint
+      ? this.findMonsterAtUi(worldPoint)
+      : null;
     const text = monsterHit
       ? this.describeMonster(monsterHit.entity, monsterHit.tile)
-      : this.describeTile(this.resolveInteractionTile(this.hoverLocation));
+      : worldPoint
+        ? this.describeTile(this.resolveInteractionTile(worldPoint))
+        : null;
+    this.flushHitDebug(worldPoint);
     if (!text) {
       tooltip.hide();
       return;
@@ -357,13 +379,36 @@ export class BlockInteractionController extends Component {
   // ── 탭 ─────────────────────────────────────────────────────
 
   private handleTap(): void {
-    if (!this.inputSource!.consumeTap(this.tapLocation)) return;
+    if (!this.inputSource!.consumeTap(this.tapLocation, this.tapScreen)) return;
     if (isUiLocationOverHud(this.tapLocation.x, this.tapLocation.y)) return;
 
-    const tile = this.resolveInteractionTile(this.tapLocation);
+    this.debugBoundsBuffer = [];
+    const worldPoint = this.screenToWorldHit(this.tapScreen);
+    // eslint-disable-next-line no-console
+    console.info('[ExGame:hitTrace] TAP', {
+      path: 'BlockInteractionController.handleTap → screenToWorld → world bounds',
+      touchUI: { x: this.tapLocation.x, y: this.tapLocation.y },
+      touchScreen: { x: this.tapScreen.x, y: this.tapScreen.y },
+      touchWorld: worldPoint
+        ? { x: worldPoint.x, y: worldPoint.y }
+        : null,
+      hitDebugOverlayAttached: !!this.hitDebug,
+    });
+    if (!worldPoint) return;
+    const tile = this.resolveInteractionTile(worldPoint);
+    this.flushHitDebug(worldPoint);
     if (!this.isWithinReach(tile)) return;
 
     void this.interactWithTile(tile);
+  }
+
+  /** 스크린(getLocation) → 렌더 카메라 월드. HUD UI 좌표와 분리. */
+  private screenToWorldHit(screen: Vec2): Vec2 | null {
+    const camera = this.getCamera();
+    if (!camera) return null;
+    screenToWorldPoint(camera, screen.x, screen.y, this.worldHitTmp);
+    this.worldHitPoint.set(this.worldHitTmp.x, this.worldHitTmp.y);
+    return this.worldHitPoint;
   }
 
   private async interactWithTile(tile: WorldTileCoordinate): Promise<void> {
@@ -829,6 +874,10 @@ export class BlockInteractionController extends Component {
 
   // ── 좌표·거리 ────────────────────────────────────────────────
 
+  private getCamera(): Camera | null {
+    return this.cameraNode?.getComponent(Camera) ?? null;
+  }
+
   private resolveInteractionTile(uiLocation: Vec2): WorldTileCoordinate {
     const hit = this.findMonsterAtUi(uiLocation);
     if (hit) return hit.tile;
@@ -845,101 +894,146 @@ export class BlockInteractionController extends Component {
     const banker = this.findBankerAtUi(uiLocation);
     if (banker) return banker.tile;
 
-    const world = this.worldNode ?? this.playerNode?.parent;
-    if (world && this.cameraNode && this.playerNode) {
-      const harvestTile = this.chunkManager!.findHarvestableTileAtUiLocation(
-        uiLocation.x,
-        uiLocation.y,
-        this.cameraNode,
-        world,
-        this.playerNode.position.x,
-        this.playerNode.position.y,
-        (blockId) => {
-          const definition = getBlockDefinition(blockId);
-          return definition.requiredHits !== null && !!definition.dropItemId;
-        },
-        (typeId) => (
-          getOreDefinition(typeId) !== null
-          || typeId === TREASURE_TYPE_ID
-          || typeId === DUNGEON_TYPE_ID
-          || typeId === NPC_TYPE_ID
-          || typeId === TELEPORTER_TYPE_ID
-          || typeId === BLACKSMITH_TYPE_ID
-          || typeId === MERCHANT_TYPE_ID
-          || typeId === BANKER_TYPE_ID
-        ),
-      );
-      if (harvestTile) return harvestTile;
-    }
+    const harvest = this.findHarvestAtUi(uiLocation);
+    if (harvest) return harvest.tile;
+
     return this.toWorldTile(uiLocation);
   }
 
   private findBlacksmithAtUi(
     uiLocation: Vec2,
   ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
-    const world = this.worldNode ?? this.playerNode?.parent;
-    if (!this.chunkManager || !this.cameraNode || !world) return null;
-    return this.chunkManager.findBlacksmithAtUiLocation(
-      uiLocation.x,
-      uiLocation.y,
-      this.cameraNode,
-      world,
+    const camera = this.getCamera();
+    if (!this.chunkManager || !camera) return null;
+    const hit = this.chunkManager.findBlacksmithAtUiLocation(
+      { x: uiLocation.x, y: uiLocation.y },
+      camera,
     );
+    if (hit) this.pushDebugBounds(hit.bounds);
+    return hit;
   }
 
   private findTeleporterAtUi(
     uiLocation: Vec2,
   ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
-    const world = this.worldNode ?? this.playerNode?.parent;
-    if (!this.chunkManager || !this.cameraNode || !world) return null;
-    return this.chunkManager.findTeleporterAtUiLocation(
-      uiLocation.x,
-      uiLocation.y,
-      this.cameraNode,
-      world,
+    const camera = this.getCamera();
+    if (!this.chunkManager || !camera) return null;
+    const hit = this.chunkManager.findTeleporterAtUiLocation(
+      { x: uiLocation.x, y: uiLocation.y },
+      camera,
     );
+    if (hit) this.pushDebugBounds(hit.bounds);
+    return hit;
   }
 
   private findMerchantAtUi(
     uiLocation: Vec2,
   ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
-    const world = this.worldNode ?? this.playerNode?.parent;
-    if (!this.chunkManager || !this.cameraNode || !world) return null;
-    return this.chunkManager.findMerchantAtUiLocation(
-      uiLocation.x,
-      uiLocation.y,
-      this.cameraNode,
-      world,
+    const camera = this.getCamera();
+    if (!this.chunkManager || !camera) return null;
+    const hit = this.chunkManager.findMerchantAtUiLocation(
+      { x: uiLocation.x, y: uiLocation.y },
+      camera,
     );
+    if (hit) this.pushDebugBounds(hit.bounds);
+    return hit;
   }
 
   private findBankerAtUi(
     uiLocation: Vec2,
   ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
-    const world = this.worldNode ?? this.playerNode?.parent;
-    if (!this.chunkManager || !this.cameraNode || !world) return null;
-    return this.chunkManager.findBankerAtUiLocation(
-      uiLocation.x,
-      uiLocation.y,
-      this.cameraNode,
-      world,
+    const camera = this.getCamera();
+    if (!this.chunkManager || !camera) return null;
+    const hit = this.chunkManager.findBankerAtUiLocation(
+      { x: uiLocation.x, y: uiLocation.y },
+      camera,
     );
+    if (hit) this.pushDebugBounds(hit.bounds);
+    return hit;
   }
 
   private findMonsterAtUi(
     uiLocation: Vec2,
   ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
-    const world = this.worldNode ?? this.playerNode?.parent;
-    if (!this.chunkManager || !this.cameraNode || !world) return null;
-    return this.chunkManager.findMonsterAtUiLocation(
-      uiLocation.x,
-      uiLocation.y,
-      this.cameraNode,
-      world,
-      (typeId) => this.getMonsterDisplaySize(typeId),
+    const camera = this.getCamera();
+    if (!this.chunkManager || !camera) return null;
+    const hit = this.chunkManager.findMonsterAtUiLocation(
+      { x: uiLocation.x, y: uiLocation.y },
+      camera,
     );
+    if (hit) this.pushDebugBounds(hit.bounds);
+    return hit;
   }
 
+  private findHarvestAtUi(
+    uiLocation: Vec2,
+  ): { tile: WorldTileCoordinate } | null {
+    const camera = this.getCamera();
+    if (!this.chunkManager || !camera || !this.playerNode) return null;
+    const hit = this.chunkManager.findHarvestableTileAtUiLocation(
+      { x: uiLocation.x, y: uiLocation.y },
+      camera,
+      this.playerNode.position.x,
+      this.playerNode.position.y,
+      (blockId) => {
+        const definition = getBlockDefinition(blockId);
+        return definition.requiredHits !== null && !!definition.dropItemId;
+      },
+      (typeId) => (
+        getOreDefinition(typeId) !== null
+        || typeId === TREASURE_TYPE_ID
+        || typeId === DUNGEON_TYPE_ID
+        || typeId === NPC_TYPE_ID
+        || typeId === TELEPORTER_TYPE_ID
+        || typeId === BLACKSMITH_TYPE_ID
+        || typeId === MERCHANT_TYPE_ID
+        || typeId === BANKER_TYPE_ID
+      ),
+    );
+    if (hit) this.pushDebugBounds(hit.bounds);
+    return hit;
+  }
+
+  private debugBoundsBuffer: UiBounds[] = [];
+
+  private pushDebugBounds(bounds: UiBounds): void {
+    if (!this.hitDebug) return;
+    this.debugBoundsBuffer.push(bounds);
+  }
+
+  private flushHitDebug(uiLocation: Vec2 | null): void {
+    if (!this.hitDebug) return;
+    const camera = this.getCamera();
+    const hitBounds = [...this.debugBoundsBuffer];
+    const nearby: UiBounds[] = [];
+    if (camera && this.chunkManager) {
+      // sprite 와 AABB 겹침 검증용 — 로드된 엔티티 UI bounds
+      for (const bounds of this.chunkManager.collectEntityUiBounds(camera)) {
+        nearby.push(bounds);
+      }
+    }
+    const touch = uiLocation
+      ? { x: uiLocation.x, y: uiLocation.y }
+      : null;
+    this.hitDebug.setFrame({
+      touch,
+      bounds: nearby,
+      hits: hitBounds.map((bounds) => ({
+        bounds,
+        success: !!touch
+          && touch.x >= bounds.minX - 2
+          && touch.x <= bounds.maxX + 2
+          && touch.y >= bounds.minY - 2
+          && touch.y <= bounds.maxY + 2,
+      })),
+    });
+    this.debugBoundsBuffer = [];
+  }
+
+  /**
+   * @deprecated 월드 히트는 visualNode UI AABB (`world-ui-hit`) 사용.
+   * 레거시 WorldPixel 발자국용 — 호출처 없음, 임시 보관.
+   */
   private getMonsterDisplaySize(
     typeId: string,
   ): { width: number; height: number } | null {
@@ -950,25 +1044,28 @@ export class BlockInteractionController extends Component {
     return FALLBACK_MONSTER_DISPLAY_SIZE[typeId] ?? null;
   }
 
-  private toWorldPixel(uiLocation: Vec2): { x: number; y: number } {
-    const world = this.worldNode ?? this.playerNode?.parent;
-    if (!world) {
+  /**
+   * 빈 바닥 타일용 — 청크 렌더 transform 으로 UI AABB 검색.
+   */
+  private toWorldTile(uiLocation: Vec2): WorldTileCoordinate {
+    const camera = this.getCamera();
+    const player = this.playerNode;
+    if (!this.chunkManager || !camera || !player) {
       return { x: 0, y: 0 };
     }
-    return uiLocationToWorldLocal(
-      uiLocation.x,
-      uiLocation.y,
-      this.cameraNode!,
-      world,
-      this.playerNode,
+    const hit = this.chunkManager.findTileAtUiLocation(
+      { x: uiLocation.x, y: uiLocation.y },
+      camera,
+      player.position.x,
+      player.position.y,
     );
-  }
-
-  private toWorldTile(uiLocation: Vec2): WorldTileCoordinate {
-    const pixel = this.toWorldPixel(uiLocation);
+    if (hit) {
+      this.pushDebugBounds(hit.bounds);
+      return hit.tile;
+    }
     return {
-      x: Math.floor(pixel.x / TILE_SIZE_PIXELS),
-      y: Math.floor(pixel.y / TILE_SIZE_PIXELS),
+      x: Math.floor(player.position.x / TILE_SIZE_PIXELS),
+      y: Math.floor(player.position.y / TILE_SIZE_PIXELS),
     };
   }
 

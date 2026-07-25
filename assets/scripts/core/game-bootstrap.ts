@@ -1,5 +1,6 @@
 import {
   _decorator,
+  Camera,
   Color,
   Component,
   game,
@@ -48,6 +49,12 @@ import {
   SPLASH_MIN_DURATION_MS,
 } from '../ui/dom-splash-ui';
 import { DomTeleporterUi } from '../ui/dom-teleporter-ui';
+import {
+  isWorldHitDebugEnabled,
+  WorldHitDebugOverlay,
+} from '../ui/world-hit-debug-overlay';
+import { isHitTraceEnabled } from '../world/world-ui-hit';
+import { probeOreVisual } from '../world/hit-coord-probe';
 import { DomBlacksmithUi } from '../ui/dom-blacksmith-ui';
 import { DomMerchantUi } from '../ui/dom-merchant-ui';
 import { initShellUi } from '../ui/mobile-shell';
@@ -561,6 +568,24 @@ export class GameBootstrap extends Component {
       worldNode,
     );
 
+    const interaction = this.node.getComponent(BlockInteractionController);
+    // hitDebug 시각화: URL/localStorage 또는 hitTrace 임시 ON 시 오버레이 부착
+    if ((isWorldHitDebugEnabled() || isHitTraceEnabled()) && interaction) {
+      const debugNode = new Node('WorldHitDebugOverlay');
+      debugNode.layer = Layers.Enum.UI_2D;
+      this.node.addChild(debugNode);
+      debugNode.addComponent(UITransform).setContentSize(4, 4);
+      debugNode.setSiblingIndex(this.node.children.length - 1);
+      const overlay = debugNode.addComponent(WorldHitDebugOverlay);
+      overlay.configure(cameraNode);
+      interaction.setHitDebugOverlay(overlay);
+      console.info(
+        '[ExGame] hitDebug/hitTrace ON — console: [ExGame:hitTrace], '
+        + 'screen: green AABB / red touch. Use F12. '
+        + 'URL tip: ?offline=1&hitDebug=1',
+      );
+    }
+
     const firstSample = generator.generateChunk(worldSeed, { x: 0, y: 0 });
     const secondSample = generator.generateChunk(worldSeed, { x: 0, y: 0 });
     const debugGlobal = globalThis as typeof globalThis & {
@@ -577,6 +602,28 @@ export class GameBootstrap extends Component {
       balance,
       gears: gears.toState(),
       bgm: bgmPlayer.getSnapshot(),
+      pinchZoom,
+      worldNode,
+      playerNode,
+      cameraNode,
+      probeHit: (zoom?: number) => {
+        const camera = cameraNode.getComponent(Camera);
+        if (!camera) return { error: 'no camera' };
+        if (typeof zoom === 'number') pinchZoom.setZoom(zoom);
+        const found = chunkManager.findNearestOreVisual(
+          playerNode.position.x,
+          playerNode.position.y,
+        );
+        if (!found) return { error: 'no ore near player', zoom: pinchZoom.getZoom() };
+        return probeOreVisual(
+          camera,
+          found.visual,
+          found.typeId,
+          pinchZoom.getZoom(),
+        );
+      },
+      setZoom: (z: number) => pinchZoom.setZoom(z),
+      getZoom: () => pinchZoom.getZoom(),
       openSettings: () => {
         const settings = this.node
           .getChildByName('SettingsHud')

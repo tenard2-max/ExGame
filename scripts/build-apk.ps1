@@ -19,10 +19,10 @@ $packageJson = Get-Content -LiteralPath (Join-Path $projectPath "package.json") 
 $version = [string]$packageJson.version
 
 if (-not (Test-Path "$studioJbr\bin\java.exe")) {
-    throw "Android Studio JBR를 찾을 수 없습니다: $studioJbr"
+    throw "Android Studio JBR not found: $studioJbr"
 }
 if (-not (Test-Path $sdk)) {
-    throw "Android SDK를 찾을 수 없습니다: $sdk"
+    throw "Android SDK not found: $sdk"
 }
 
 $env:JAVA_HOME = $studioJbr
@@ -34,15 +34,15 @@ $sdkDirProp = $sdk.Replace('\', '/')
 Set-Content -LiteralPath (Join-Path $androidDir "local.properties") -Value "sdk.dir=$sdkDirProp" -Encoding ASCII
 
 if (-not $SkipSync) {
-    Write-Host "[1/4] 웹 빌드 → assets/www 동기화"
+    Write-Host "[1/4] Sync web build to assets/www"
     & (Join-Path $PSScriptRoot "sync-android-www.ps1")
 } else {
-    Write-Host "[1/4] sync 생략"
+    Write-Host "[1/4] Skip sync"
 }
 
 New-Item -ItemType Directory -Path $tools -Force | Out-Null
 if (-not (Test-Path "$gradleHome\bin\gradle.bat")) {
-    Write-Host "[2/4] Gradle $gradleVer 준비 ($tools)"
+    Write-Host "[2/4] Prepare Gradle $gradleVer ($tools)"
     if (-not (Test-Path $gradleZip)) {
         Invoke-WebRequest -Uri "https://services.gradle.org/distributions/gradle-$gradleVer-bin.zip" -OutFile $gradleZip
     }
@@ -51,28 +51,28 @@ if (-not (Test-Path "$gradleHome\bin\gradle.bat")) {
     }
     tar -xf $gradleZip -C $tools
     if (-not (Test-Path "$gradleHome\bin\gradle.bat")) {
-        throw "Gradle 압축 해제 실패: $gradleHome"
+        throw "Gradle extract failed: $gradleHome"
     }
 } else {
-    Write-Host "[2/4] Gradle 이미 있음"
+    Write-Host "[2/4] Gradle already present"
 }
 
 Set-Location $androidDir
 if (-not (Test-Path ".\gradlew.bat") -or -not (Test-Path ".\gradle\wrapper\gradle-wrapper.jar")) {
-    Write-Host "[3/4] Gradle Wrapper 생성"
+    Write-Host "[3/4] Create Gradle Wrapper"
     & "$gradleHome\bin\gradle.bat" wrapper --gradle-version $gradleVer
-    if ($LASTEXITCODE -ne 0) { throw "gradle wrapper 실패" }
+    if ($LASTEXITCODE -ne 0) { throw "gradle wrapper failed" }
 } else {
-    Write-Host "[3/4] Wrapper 이미 있음"
+    Write-Host "[3/4] Wrapper already present"
 }
 
 Write-Host "[4/4] assembleDebug"
 & .\gradlew.bat assembleDebug --no-daemon
-if ($LASTEXITCODE -ne 0) { throw "assembleDebug 실패" }
+if ($LASTEXITCODE -ne 0) { throw "assembleDebug failed" }
 
 $debugApk = Join-Path $androidDir "app\build\outputs\apk\debug\app-debug.apk"
 if (-not (Test-Path -LiteralPath $debugApk)) {
-    throw "APK를 찾지 못했습니다: $debugApk"
+    throw "APK not found: $debugApk"
 }
 
 $outDir = Join-Path $projectPath "release"
@@ -81,7 +81,7 @@ $dest = Join-Path $outDir "exgame-$version-android-debug.apk"
 Copy-Item -LiteralPath $debugApk -Destination $dest -Force
 
 Write-Host ""
-Write-Host "APK 빌드 완료:"
+Write-Host "APK build done:"
 Write-Host "  $dest"
 Write-Host "  Size: $((Get-Item $dest).Length) bytes"
-Write-Host "폰에 설치: adb install -r `"$dest`""
+Write-Host ('Install: adb install -r "' + $dest + '"')

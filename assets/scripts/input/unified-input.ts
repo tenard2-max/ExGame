@@ -19,18 +19,25 @@ const TAP_MAX_DURATION_MS = 300;
 /**
  * 키보드와 포인터 드래그(마우스·터치)를 동일한 이동 벡터로 변환합니다.
  * hover 상태에 의존하지 않습니다.
+ *
+ * HUD: getUILocation / consumeTap(out)
+ * 월드 히트: getLocation / consumeTap(out, outScreen)
  */
 @ccclass('UnifiedInput')
 export class UnifiedInput extends Component {
   private readonly pressedKeys = new Set<KeyCode>();
   private readonly pointerStart = new Vec2();
   private readonly pointerCurrent = new Vec2();
+  private readonly pointerStartScreen = new Vec2();
+  private readonly pointerCurrentScreen = new Vec2();
   private readonly keyboardDirection = new Vec2();
   private readonly pointerDirection = new Vec2();
   private readonly virtualDirection = new Vec2();
 
   private readonly pendingTapLocation = new Vec2();
+  private readonly pendingTapScreen = new Vec2();
   private readonly hoverLocation = new Vec2();
+  private readonly hoverScreen = new Vec2();
   private activeTouchId: number | null = null;
   private isMouseDragging = false;
   private pointerDownAtMs = 0;
@@ -75,10 +82,6 @@ export class UnifiedInput extends Component {
     return out;
   }
 
-  /**
-   * 모바일 십자 패드 등 DOM 가상 스틱 입력을 설정합니다.
-   * x/y 는 -1~1 범위로 클램프합니다.
-   */
   setVirtualDirection(x: number, y: number): void {
     const clampedX = Math.max(-1, Math.min(1, x));
     const clampedY = Math.max(-1, Math.min(1, y));
@@ -88,45 +91,40 @@ export class UnifiedInput extends Component {
     }
   }
 
-  /**
-   * 핀치 줌 등 두 손가락 제스처가 시작되면 이동/탭/채집 제스처를 취소합니다.
-   */
   cancelPointerGesture(): void {
     this.activeTouchId = null;
     this.isMouseDragging = false;
     this.hasPendingTap = false;
     this.pointerMaxDistance = 0;
     this.pointerCurrent.set(this.pointerStart);
+    this.pointerCurrentScreen.set(this.pointerStartScreen);
   }
 
   /**
-   * 드래그 없이 짧게 눌렀다 뗀 탭을 1회 소비합니다.
-   * 마우스 클릭과 터치 탭이 동일하게 처리됩니다.
+   * out = getUILocation (HUD), outScreen = getLocation (월드 히트).
    */
-  consumeTap(out: Vec2): boolean {
+  consumeTap(out: Vec2, outScreen?: Vec2): boolean {
     if (!this.hasPendingTap) return false;
     out.set(this.pendingTapLocation);
+    outScreen?.set(this.pendingTapScreen);
     this.hasPendingTap = false;
     return true;
   }
 
-  /**
-   * 포인터를 움직이지 않고 누르고 있는 상태(채집 제스처)인지 반환합니다.
-   * 드래그(이동)로 전환되면 false가 됩니다. 마우스·터치 공통입니다.
-   */
-  isPointerHeldStill(out: Vec2): boolean {
+  isPointerHeldStill(out: Vec2, outScreen?: Vec2): boolean {
     const isPointerDown = this.isMouseDragging || this.activeTouchId !== null;
     if (!isPointerDown || this.pointerMaxDistance > POINTER_DEAD_ZONE) {
       return false;
     }
     out.set(this.pointerStart);
+    outScreen?.set(this.pointerStartScreen);
     return true;
   }
 
-  /** 마우스 커서의 현재 UI 좌표입니다. 터치 전용 기기에서는 false입니다. */
-  getHoverLocation(out: Vec2): boolean {
+  getHoverLocation(out: Vec2, outScreen?: Vec2): boolean {
     if (!this.hasHover) return false;
     out.set(this.hoverLocation);
+    outScreen?.set(this.hoverScreen);
     return true;
   }
 
@@ -142,16 +140,20 @@ export class UnifiedInput extends Component {
     if (event.getButton() !== EventMouse.BUTTON_LEFT) return;
     this.isMouseDragging = true;
     event.getUILocation(this.pointerStart);
+    event.getLocation(this.pointerStartScreen);
     this.pointerCurrent.set(this.pointerStart);
+    this.pointerCurrentScreen.set(this.pointerStartScreen);
     this.beginPointerGesture();
   }
 
   private onMouseMove(event: EventMouse): void {
     event.getUILocation(this.hoverLocation);
+    event.getLocation(this.hoverScreen);
     this.hasHover = true;
 
     if (!this.isMouseDragging) return;
     event.getUILocation(this.pointerCurrent);
+    event.getLocation(this.pointerCurrentScreen);
     this.trackPointerDistance();
   }
 
@@ -160,6 +162,7 @@ export class UnifiedInput extends Component {
     this.isMouseDragging = false;
     this.finishPointerGesture();
     this.pointerCurrent.set(this.pointerStart);
+    this.pointerCurrentScreen.set(this.pointerStartScreen);
   }
 
   private onTouchStart(event: EventTouch): void {
@@ -169,13 +172,16 @@ export class UnifiedInput extends Component {
 
     this.activeTouchId = touchId;
     event.getUILocation(this.pointerStart);
+    event.getLocation(this.pointerStartScreen);
     this.pointerCurrent.set(this.pointerStart);
+    this.pointerCurrentScreen.set(this.pointerStartScreen);
     this.beginPointerGesture();
   }
 
   private onTouchMove(event: EventTouch): void {
     if (event.getID() !== this.activeTouchId) return;
     event.getUILocation(this.pointerCurrent);
+    event.getLocation(this.pointerCurrentScreen);
     this.trackPointerDistance();
   }
 
@@ -184,6 +190,7 @@ export class UnifiedInput extends Component {
     this.activeTouchId = null;
     this.finishPointerGesture();
     this.pointerCurrent.set(this.pointerStart);
+    this.pointerCurrentScreen.set(this.pointerStartScreen);
   }
 
   private beginPointerGesture(): void {
@@ -203,6 +210,7 @@ export class UnifiedInput extends Component {
       && duration <= TAP_MAX_DURATION_MS
     ) {
       this.pendingTapLocation.set(this.pointerCurrent);
+      this.pendingTapScreen.set(this.pointerCurrentScreen);
       this.hasPendingTap = true;
     }
   }
@@ -249,6 +257,8 @@ export class UnifiedInput extends Component {
     this.hasHover = false;
     this.pointerStart.set(0, 0);
     this.pointerCurrent.set(0, 0);
+    this.pointerStartScreen.set(0, 0);
+    this.pointerCurrentScreen.set(0, 0);
     this.virtualDirection.set(0, 0);
   }
 }

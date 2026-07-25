@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.13 — 2026-07-26
+
+### 수정
+- 월드 히트: `getLocation`→`Camera.screenToWorld`→`getBoundingBoxToWorld` (렌더와 동일 공간)
+- `screenToUiLocation` visibleOrigin 이중 가산 제거 (엔진 getUILocation과 일치)
+- PC/Android 동일 히트 경로. Android APK versionCode 113
+
+## 0.1.12 — 2026-07-26
+
+### 수정
+- 월드 히트: 스프라이트 UITransform→worldToScreen→UI AABB 통일 (`world-ui-hit.ts`)
+- 경험식 zoom/screenToWorld 역산 제거. `?hitDebug=1` 로 AABB/터치 디버그
+
 ## 0.1.11 — 2026-07-26
 
 ### 수정

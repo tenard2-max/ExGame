@@ -1,4 +1,4 @@
-import { Color, Graphics, Layers, Node, Rect, UITransform } from 'cc';
+import { Camera, Color, Graphics, Layers, Node, Rect, UITransform } from 'cc';
 
 import {
   CHUNK_MEMORY_RADIUS,
@@ -37,7 +37,15 @@ import {
   entityVisualNodeName,
   playNodeHitShake,
 } from './hit-shake';
-import { worldLocalAabbContainsUi } from '../ui/hud-layout';
+import {
+  getChunkTileUIBounds,
+  getEntityUIBounds,
+  hitTestUIBounds,
+  isHitTraceEnabled,
+  logEntityHitTrace,
+  type UiBounds,
+  type UiPoint,
+} from './world-ui-hit';
 import { sampleGroundBlockAt } from './tile-region-field';
 import type {
   ChunkManager,
@@ -243,22 +251,27 @@ export class RuntimeChunkManager implements ChunkManager {
     playNodeHitShake(feedback, restX, restY);
   }
 
+  /** 엔티티 비주얼 스프라이트 노드를 찾습니다. */
+  findEntityVisualNode(entityId: EntityId): Node | null {
+    for (const chunk of this.loadedChunks.values()) {
+      const visual = chunk.node.getChildByName(entityVisualNodeName(entityId));
+      if (visual) return visual;
+    }
+    return null;
+  }
+
   /**
-   * UI 클릭이 몬스터 스프라이트 AABB(렌더와 동일 World→UI) 안이면 반환합니다.
-   * 줌과 무관하게 화면상의 위치와 일치합니다.
+   * UI 터치와 실제 몬스터 스프라이트 UI AABB 를 비교합니다.
+   * getDisplaySize 는 사용하지 않습니다(스프라이트 transform 이 source of truth).
    */
   findMonsterAtUiLocation(
-    uiX: number,
-    uiY: number,
-    cameraNode: Node,
-    worldNode: Node,
-    getDisplaySize: (
-      typeId: string,
-    ) => { width: number; height: number } | null,
-  ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
+    uiTouch: UiPoint,
+    camera: Camera,
+  ): { entity: GeneratedContent; tile: WorldTileCoordinate; bounds: UiBounds } | null {
     let best: {
       entity: GeneratedContent;
       tile: WorldTileCoordinate;
+      bounds: UiBounds;
       area: number;
     } | null = null;
 
@@ -273,32 +286,12 @@ export class RuntimeChunkManager implements ChunkManager {
 
       for (const entry of effective.content.entries) {
         if (!entry.typeId.startsWith('monster-')) continue;
-        const size = getDisplaySize(entry.typeId);
-        if (!size) continue;
+        const visual = chunk.node.getChildByName(entityVisualNodeName(entry.id));
+        if (!visual) continue;
+        const bounds = getEntityUIBounds(visual, camera);
+        if (!bounds || !hitTestUIBounds(uiTouch, bounds, 2)) continue;
 
-        const centerX = (originTileX + entry.coordinate.x + 0.5)
-          * TILE_SIZE_PIXELS;
-        const centerY = (originTileY + entry.coordinate.y + 0.5)
-          * TILE_SIZE_PIXELS;
-        const halfW = size.width / 2;
-        const halfH = size.height / 2;
-        if (
-          !worldLocalAabbContainsUi(
-            uiX,
-            uiY,
-            centerX,
-            centerY,
-            halfW,
-            halfH,
-            cameraNode,
-            worldNode,
-            4,
-          )
-        ) {
-          continue;
-        }
-
-        const area = size.width * size.height;
+        const area = (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY);
         if (!best || area < best.area) {
           best = {
             entity: entry,
@@ -306,6 +299,7 @@ export class RuntimeChunkManager implements ChunkManager {
               x: originTileX + entry.coordinate.x,
               y: originTileY + entry.coordinate.y,
             },
+            bounds,
             area,
           };
         }
@@ -313,13 +307,13 @@ export class RuntimeChunkManager implements ChunkManager {
     }
 
     return best
-      ? { entity: best.entity, tile: best.tile }
+      ? { entity: best.entity, tile: best.tile, bounds: best.bounds }
       : null;
   }
 
   /**
-   * 월드 픽셀이 몬스터 스프라이트 발자국(AABB) 안에 있으면 그 몬스터를 반환합니다.
-   * 시각적으로 큰 몬스터를 타일 1칸이 아닌 이미지 영역으로 인식하기 위함입니다.
+   * @deprecated 줌≠1 에서 깨짐. 월드 히트는 findMonsterAtUiLocation 사용.
+   * 월드 픽셀이 몬스터 논리 발자국(AABB) 안에 있으면 그 몬스터를 반환합니다.
    */
   findMonsterAtWorldPixel(
     worldPixelX: number,
@@ -352,7 +346,6 @@ export class RuntimeChunkManager implements ChunkManager {
           * TILE_SIZE_PIXELS;
         const centerY = (originTileY + entry.coordinate.y + 0.5)
           * TILE_SIZE_PIXELS;
-        // 스프라이트와 동일한 AABB (+4px 여유) — 커서 아래 바닥 타일보다 우선합니다.
         const pad = 4;
         const halfW = size.width / 2 + pad;
         const halfH = size.height / 2 + pad;
@@ -385,19 +378,20 @@ export class RuntimeChunkManager implements ChunkManager {
   }
 
   /**
-   * UI 클릭으로 대형 NPC 스프라이트를 집습니다.
+   * UI 터치와 실제 NPC 스프라이트 UI AABB 를 비교합니다.
+   * 다중 히트 시 면적이 가장 작은(가까운) 스프라이트를 고릅니다.
    */
   findNpcAtUiLocation(
-    uiX: number,
-    uiY: number,
-    cameraNode: Node,
-    worldNode: Node,
+    uiTouch: UiPoint,
+    camera: Camera,
     typeId: string,
-    footprintW: number,
-    footprintH: number,
-  ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
-    const halfW = (footprintW * TILE_SIZE_PIXELS) / 2;
-    const halfH = (footprintH * TILE_SIZE_PIXELS) / 2;
+  ): { entity: GeneratedContent; tile: WorldTileCoordinate; bounds: UiBounds } | null {
+    let best: {
+      entity: GeneratedContent;
+      tile: WorldTileCoordinate;
+      bounds: UiBounds;
+      area: number;
+    } | null = null;
 
     for (const chunk of this.loadedChunks.values()) {
       const effective = mergeChunkWithDelta(
@@ -410,39 +404,32 @@ export class RuntimeChunkManager implements ChunkManager {
 
       for (const entry of effective.content.entries) {
         if (entry.typeId !== typeId) continue;
-        const centerX = (originTileX + entry.coordinate.x + 0.5)
-          * TILE_SIZE_PIXELS;
-        const centerY = (originTileY + entry.coordinate.y + 0.5)
-          * TILE_SIZE_PIXELS;
-        if (
-          !worldLocalAabbContainsUi(
-            uiX,
-            uiY,
-            centerX,
-            centerY,
-            halfW,
-            halfH,
-            cameraNode,
-            worldNode,
-            4,
-          )
-        ) {
-          continue;
+        const visual = chunk.node.getChildByName(entityVisualNodeName(entry.id));
+        if (!visual) continue;
+        const bounds = getEntityUIBounds(visual, camera);
+        if (!bounds || !hitTestUIBounds(uiTouch, bounds, 2)) continue;
+        const area = (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY);
+        if (!best || area < best.area) {
+          best = {
+            entity: entry,
+            tile: {
+              x: originTileX + entry.coordinate.x,
+              y: originTileY + entry.coordinate.y,
+            },
+            bounds,
+            area,
+          };
         }
-        return {
-          entity: entry,
-          tile: {
-            x: originTileX + entry.coordinate.x,
-            y: originTileY + entry.coordinate.y,
-          },
-        };
       }
     }
-    return null;
+    return best
+      ? { entity: best.entity, tile: best.tile, bounds: best.bounds }
+      : null;
   }
 
   /**
-   * 대장장이·텔레포터 등 대형 NPC 스프라이트 AABB 히트 테스트입니다.
+   * @deprecated 줌≠1 에서 깨짐. 월드 히트는 findNpcAtUiLocation 사용.
+   * 대장장이·텔레포터 등 대형 NPC 논리 발자국(레거시 보관).
    */
   findNpcAtWorldPixel(
     worldPixelX: number,
@@ -503,20 +490,10 @@ export class RuntimeChunkManager implements ChunkManager {
   }
 
   findBlacksmithAtUiLocation(
-    uiX: number,
-    uiY: number,
-    cameraNode: Node,
-    worldNode: Node,
-  ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
-    return this.findNpcAtUiLocation(
-      uiX,
-      uiY,
-      cameraNode,
-      worldNode,
-      BLACKSMITH_TYPE_ID,
-      BLACKSMITH_FOOTPRINT_W,
-      BLACKSMITH_FOOTPRINT_H,
-    );
+    uiTouch: UiPoint,
+    camera: Camera,
+  ): { entity: GeneratedContent; tile: WorldTileCoordinate; bounds: UiBounds } | null {
+    return this.findNpcAtUiLocation(uiTouch, camera, BLACKSMITH_TYPE_ID);
   }
 
   findTeleporterAtWorldPixel(
@@ -533,20 +510,10 @@ export class RuntimeChunkManager implements ChunkManager {
   }
 
   findTeleporterAtUiLocation(
-    uiX: number,
-    uiY: number,
-    cameraNode: Node,
-    worldNode: Node,
-  ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
-    return this.findNpcAtUiLocation(
-      uiX,
-      uiY,
-      cameraNode,
-      worldNode,
-      TELEPORTER_TYPE_ID,
-      TELEPORTER_FOOTPRINT_W,
-      TELEPORTER_FOOTPRINT_H,
-    );
+    uiTouch: UiPoint,
+    camera: Camera,
+  ): { entity: GeneratedContent; tile: WorldTileCoordinate; bounds: UiBounds } | null {
+    return this.findNpcAtUiLocation(uiTouch, camera, TELEPORTER_TYPE_ID);
   }
 
   findMerchantAtWorldPixel(
@@ -563,20 +530,10 @@ export class RuntimeChunkManager implements ChunkManager {
   }
 
   findMerchantAtUiLocation(
-    uiX: number,
-    uiY: number,
-    cameraNode: Node,
-    worldNode: Node,
-  ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
-    return this.findNpcAtUiLocation(
-      uiX,
-      uiY,
-      cameraNode,
-      worldNode,
-      MERCHANT_TYPE_ID,
-      MERCHANT_FOOTPRINT_W,
-      MERCHANT_FOOTPRINT_H,
-    );
+    uiTouch: UiPoint,
+    camera: Camera,
+  ): { entity: GeneratedContent; tile: WorldTileCoordinate; bounds: UiBounds } | null {
+    return this.findNpcAtUiLocation(uiTouch, camera, MERCHANT_TYPE_ID);
   }
 
   findBankerAtWorldPixel(
@@ -593,41 +550,105 @@ export class RuntimeChunkManager implements ChunkManager {
   }
 
   findBankerAtUiLocation(
-    uiX: number,
-    uiY: number,
-    cameraNode: Node,
-    worldNode: Node,
-  ): { entity: GeneratedContent; tile: WorldTileCoordinate } | null {
-    return this.findNpcAtUiLocation(
-      uiX,
-      uiY,
-      cameraNode,
-      worldNode,
-      BANKER_TYPE_ID,
-      BANKER_FOOTPRINT_W,
-      BANKER_FOOTPRINT_H,
-    );
+    uiTouch: UiPoint,
+    camera: Camera,
+  ): { entity: GeneratedContent; tile: WorldTileCoordinate; bounds: UiBounds } | null {
+    return this.findNpcAtUiLocation(uiTouch, camera, BANKER_TYPE_ID);
   }
 
   /**
-   * UI 클릭으로 광석·나무 등 채집 타일을 집습니다.
-   * 플레이어 주변 타일을 World→UI AABB로 검사합니다.
+   * 광석(스프라이트) 우선, 없으면 나무 등 베이크 타일을 청크 렌더 transform 으로 UI AABB 히트.
    */
   findHarvestableTileAtUiLocation(
-    uiX: number,
-    uiY: number,
-    cameraNode: Node,
-    worldNode: Node,
+    uiTouch: UiPoint,
+    camera: Camera,
     playerWorldX: number,
     playerWorldY: number,
     isHarvestableBlock: (blockId: string) => boolean,
     isHarvestableContent: (typeId: string) => boolean,
-  ): WorldTileCoordinate | null {
+  ): { tile: WorldTileCoordinate; bounds: UiBounds } | null {
+    let best: { tile: WorldTileCoordinate; bounds: UiBounds; distSq: number } | null = null;
+    const trace = isHitTraceEnabled();
+    let tracedOre = false;
+
+    // 1) 콘텐츠 스프라이트(광석·보물 등)
+    for (const chunk of this.loadedChunks.values()) {
+      const effective = mergeChunkWithDelta(
+        chunk.base,
+        chunk.delta,
+        this.worldSeed,
+      );
+      const originTileX = chunk.base.coordinate.x * CHUNK_SIZE_TILES;
+      const originTileY = chunk.base.coordinate.y * CHUNK_SIZE_TILES;
+
+      for (const entry of effective.content.entries) {
+        if (!isHarvestableContent(entry.typeId)) continue;
+        if (entry.typeId.startsWith('monster-')) continue;
+        const visual = chunk.node.getChildByName(entityVisualNodeName(entry.id));
+        if (!visual) continue;
+        const bounds = getEntityUIBounds(visual, camera);
+        const inside = !!bounds && hitTestUIBounds(uiTouch, bounds, 2);
+        const tile = {
+          x: originTileX + entry.coordinate.x,
+          y: originTileY + entry.coordinate.y,
+        };
+        const cx = (tile.x + 0.5) * TILE_SIZE_PIXELS;
+        const cy = (tile.y + 0.5) * TILE_SIZE_PIXELS;
+        const dx = cx - playerWorldX;
+        const dy = cy - playerWorldY;
+        const distSq = dx * dx + dy * dy;
+
+        // 플레이어 근처 harvest visual (광석 등) 콘솔 증명 로그
+        if (
+          trace
+          && (inside || distSq < (TILE_SIZE_PIXELS * 8) ** 2)
+          && (entry.typeId.startsWith('ore-') || inside)
+        ) {
+          tracedOre = true;
+          logEntityHitTrace({
+            tag: inside ? 'HARVEST_HIT' : 'HARVEST_NEAR_MISS',
+            path: 'RuntimeChunkManager.findHarvestableTileAtUiLocation → getEntityWorldBounds(visualNode)',
+            uiTouch,
+            camera,
+            visual,
+            typeId: entry.typeId,
+            hit: inside,
+            worldZoom: visual.worldScale.x,
+          });
+        }
+
+        if (!bounds || !inside) continue;
+        if (!best || distSq < best.distSq) {
+          best = { tile, bounds, distSq };
+        }
+      }
+    }
+    if (best) {
+      if (trace) {
+        // eslint-disable-next-line no-console
+        console.info('[ExGame:hitTrace] PATH_OK harvest via world-ui-hit visualNode', {
+          tile: best.tile,
+          boundsCenter: {
+            x: +best.bounds.centerX.toFixed(2),
+            y: +best.bounds.centerY.toFixed(2),
+          },
+        });
+      }
+      return { tile: best.tile, bounds: best.bounds };
+    }
+
+    if (trace && !tracedOre) {
+      // eslint-disable-next-line no-console
+      console.info(
+        '[ExGame:hitTrace] PATH_REACHED findHarvestableTileAtUiLocation (no nearby ore visual)',
+        { uiTouch, playerWorldX, playerWorldY },
+      );
+    }
+
+    // 2) 베이크 지형(나무 등) — 청크 노드 transform
     const baseTileX = Math.floor(playerWorldX / TILE_SIZE_PIXELS);
     const baseTileY = Math.floor(playerWorldY / TILE_SIZE_PIXELS);
-    let best: { tile: WorldTileCoordinate; distSq: number } | null = null;
     const searchRadius = 6;
-    const half = TILE_SIZE_PIXELS / 2;
 
     for (let oy = -searchRadius; oy <= searchRadius; oy += 1) {
       for (let ox = -searchRadius; ox <= searchRadius; ox += 1) {
@@ -635,38 +656,143 @@ export class RuntimeChunkManager implements ChunkManager {
         if (!this.isTileHarvestable(tile, isHarvestableBlock, isHarvestableContent)) {
           continue;
         }
-        const centerX = (tile.x + 0.5) * TILE_SIZE_PIXELS;
-        const centerY = (tile.y + 0.5) * TILE_SIZE_PIXELS;
-        if (
-          !worldLocalAabbContainsUi(
-            uiX,
-            uiY,
-            centerX,
-            centerY,
-            half,
-            half,
-            cameraNode,
-            worldNode,
-            half,
-          )
-        ) {
+        const entities = this.getContentEntitiesAt(tile);
+        if (entities.some((e) => isHarvestableContent(e.typeId)
+          && this.findEntityVisualNode(e.id))) {
           continue;
         }
-        const dx = centerX - playerWorldX;
-        const dy = centerY - playerWorldY;
+        const chunk = this.getRuntimeChunkAt(tile);
+        if (!chunk) continue;
+        const local = toLocalTile(tile);
+        const bounds = getChunkTileUIBounds(
+          chunk.node,
+          local.x,
+          local.y,
+          TILE_SIZE_PIXELS,
+          camera,
+        );
+        if (!bounds || !hitTestUIBounds(uiTouch, bounds, 2)) continue;
+        const cx = (tile.x + 0.5) * TILE_SIZE_PIXELS;
+        const cy = (tile.y + 0.5) * TILE_SIZE_PIXELS;
+        const dx = cx - playerWorldX;
+        const dy = cy - playerWorldY;
         const distSq = dx * dx + dy * dy;
         if (!best || distSq < best.distSq) {
-          best = { tile, distSq };
+          best = { tile, bounds, distSq };
         }
       }
     }
-    return best?.tile ?? null;
+
+    return best ? { tile: best.tile, bounds: best.bounds } : null;
+  }
+
+  /** 디버그: 로드된 엔티티 스프라이트 UI AABB 목록. */
+  collectEntityUiBounds(camera: Camera): UiBounds[] {
+    const result: UiBounds[] = [];
+    for (const chunk of this.loadedChunks.values()) {
+      const effective = mergeChunkWithDelta(
+        chunk.base,
+        chunk.delta,
+        this.worldSeed,
+      );
+      for (const entry of effective.content.entries) {
+        const visual = chunk.node.getChildByName(entityVisualNodeName(entry.id));
+        if (!visual) continue;
+        const bounds = getEntityUIBounds(visual, camera);
+        if (bounds) result.push(bounds);
+      }
+    }
+    return result;
+  }
+
+  /** 진단: 플레이어 근처 가장 가까운 ore-* 스프라이트. */
+  findNearestOreVisual(
+    playerWorldX: number,
+    playerWorldY: number,
+  ): { visual: Node; typeId: string; tile: WorldTileCoordinate } | null {
+    let best: {
+      visual: Node;
+      typeId: string;
+      tile: WorldTileCoordinate;
+      distSq: number;
+    } | null = null;
+
+    for (const chunk of this.loadedChunks.values()) {
+      const effective = mergeChunkWithDelta(
+        chunk.base,
+        chunk.delta,
+        this.worldSeed,
+      );
+      const originTileX = chunk.base.coordinate.x * CHUNK_SIZE_TILES;
+      const originTileY = chunk.base.coordinate.y * CHUNK_SIZE_TILES;
+      for (const entry of effective.content.entries) {
+        if (!entry.typeId.startsWith('ore-')) continue;
+        const visual = chunk.node.getChildByName(entityVisualNodeName(entry.id));
+        if (!visual) continue;
+        const tile = {
+          x: originTileX + entry.coordinate.x,
+          y: originTileY + entry.coordinate.y,
+        };
+        const cx = (tile.x + 0.5) * TILE_SIZE_PIXELS;
+        const cy = (tile.y + 0.5) * TILE_SIZE_PIXELS;
+        const dx = cx - playerWorldX;
+        const dy = cy - playerWorldY;
+        const distSq = dx * dx + dy * dy;
+        if (!best || distSq < best.distSq) {
+          best = { visual, typeId: entry.typeId, tile, distSq };
+        }
+      }
+    }
+    return best
+      ? { visual: best.visual, typeId: best.typeId, tile: best.tile }
+      : null;
   }
 
   /**
-   * 광석·나무·돌 등 채집 대상을 타일 전체 AABB로 집습니다.
-   * 포인터 Y가 타일 상단에서 어긋나도 잡히도록 주변 타일을 검사하고
-   * 클릭에 가장 가까운 타일 중심을 고릅니다.
+   * UI 터치가 가리키는 월드 타일 (청크 렌더 transform → UI AABB).
+   * 빈 바닥 클릭·배치용. 줌 보정 공식 없음.
+   */
+  findTileAtUiLocation(
+    uiTouch: UiPoint,
+    camera: Camera,
+    playerWorldX: number,
+    playerWorldY: number,
+  ): { tile: WorldTileCoordinate; bounds: UiBounds } | null {
+    const baseTileX = Math.floor(playerWorldX / TILE_SIZE_PIXELS);
+    const baseTileY = Math.floor(playerWorldY / TILE_SIZE_PIXELS);
+    const searchRadius = 10;
+    let best: { tile: WorldTileCoordinate; bounds: UiBounds; distSq: number } | null = null;
+
+    for (let oy = -searchRadius; oy <= searchRadius; oy += 1) {
+      for (let ox = -searchRadius; ox <= searchRadius; ox += 1) {
+        const tile = { x: baseTileX + ox, y: baseTileY + oy };
+        const chunk = this.getRuntimeChunkAt(tile);
+        if (!chunk) continue;
+        const local = toLocalTile(tile);
+        const bounds = getChunkTileUIBounds(
+          chunk.node,
+          local.x,
+          local.y,
+          TILE_SIZE_PIXELS,
+          camera,
+        );
+        if (!bounds || !hitTestUIBounds(uiTouch, bounds, 0)) continue;
+        const cx = (tile.x + 0.5) * TILE_SIZE_PIXELS;
+        const cy = (tile.y + 0.5) * TILE_SIZE_PIXELS;
+        const dx = cx - playerWorldX;
+        const dy = cy - playerWorldY;
+        const distSq = dx * dx + dy * dy;
+        if (!best || distSq < best.distSq) {
+          best = { tile, bounds, distSq };
+        }
+      }
+    }
+    return best ? { tile: best.tile, bounds: best.bounds } : null;
+  }
+
+  /**
+   * @deprecated 줌≠1 에서 깨짐. 월드 히트는 findHarvestableTileAtUiLocation 사용.
+   * 광석·나무·돌 등 채집 대상을 타일 전체 AABB로 집습니다(레거시 보관).
    */
   findHarvestableTileAtWorldPixel(
     worldPixelX: number,
@@ -677,7 +803,6 @@ export class RuntimeChunkManager implements ChunkManager {
     const baseTileX = Math.floor(worldPixelX / TILE_SIZE_PIXELS);
     const baseTileY = Math.floor(worldPixelY / TILE_SIZE_PIXELS);
     let best: { tile: WorldTileCoordinate; distSq: number } | null = null;
-    // 타일 상·하단 클릭 시 floor 오차를 흡수할 여유
     const searchRadius = 2;
     const half = TILE_SIZE_PIXELS / 2 + TILE_SIZE_PIXELS / 2;
 

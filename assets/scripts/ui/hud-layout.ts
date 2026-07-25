@@ -1,4 +1,4 @@
-import { Camera, Node, UITransform, Vec3, view } from 'cc';
+import { Camera, Node, Vec3, view } from 'cc';
 
 /** 디자인 해상도(2560×1440) UI 좌표계 기준 HUD 배치 상수입니다. */
 
@@ -7,8 +7,6 @@ export const DESIGN_HEIGHT = 1440;
 
 const uiToScreenPos = new Vec3();
 const uiToWorldPos = new Vec3();
-const probeLocal = new Vec3();
-const screenTmp = new Vec3();
 
 /**
  * getUILocation(가시 영역) → 디자인 좌표(2560×1440)로 변환합니다.
@@ -27,10 +25,11 @@ export function normalizeUiToDesign(uiX: number, uiY: number): { x: number; y: n
 
 /**
  * getUILocation → Canvas 로컬 픽셀(카메라 뷰 공간).
+ * HUD·툴팁 배치용만 사용.
  *
- * Cocos `_convertToUISpace` 의 역변환(UI→스크린) 후 Camera.screenToWorld 를 씁니다.
- * HUD·툴팁 등 Canvas 자식 배치용입니다. 월드 오브젝트 히트에는
- * `uiLocationToWorldLocal` 을 쓰세요(World 스케일/줌 반영).
+ * @deprecated-for-world-hit 월드 오브젝트 히트에는 쓰지 말 것.
+ *   → `world-ui-hit.ts` (`getEntityUIBounds` / `hitTestWorldEntity` / `getChunkTileUIBounds`).
+ *   과거 줌 보정(÷World.scale, probe, 경험식) 경로의 잔여 — tooltip canvasLocal 전용으로 유지.
  */
 export function uiLocationToCanvasLocal(
   uiX: number,
@@ -50,7 +49,6 @@ export function uiLocationToCanvasLocal(
   const viewport = view.getViewportRect();
   const scaleX = view.getScaleX() || 1;
   const scaleY = view.getScaleY() || 1;
-  // `_convertToUISpace`: ui = (screen - viewport) / scale
   uiToScreenPos.set(
     (uiX - origin.x) * scaleX + viewport.x,
     (uiY - origin.y) * scaleY + viewport.y,
@@ -65,125 +63,6 @@ export function uiLocationToCanvasLocal(
   return {
     x: uiToWorldPos.x - canvas.worldPosition.x,
     y: uiToWorldPos.y - canvas.worldPosition.y,
-  };
-}
-
-/**
- * World 로컬 픽셀 → getUILocation 과 동일 공간.
- * 렌더 경로(World UITransform → Camera.worldToScreen)라 줌과 스프라이트 위치가 일치합니다.
- */
-export function worldLocalToUiLocation(
-  localX: number,
-  localY: number,
-  cameraNode: Node,
-  worldNode: Node,
-): { x: number; y: number } {
-  const camera = cameraNode.getComponent(Camera);
-  const worldUi = worldNode.getComponent(UITransform);
-  const origin = view.getVisibleOrigin();
-  if (!camera || !worldUi) {
-    const visible = view.getVisibleSize();
-    return {
-      x: origin.x + localX * (worldNode.scale.x || 1)
-        - cameraNode.position.x + visible.width / 2,
-      y: origin.y + localY * (worldNode.scale.y || 1)
-        - cameraNode.position.y + visible.height / 2,
-    };
-  }
-
-  probeLocal.set(localX, localY, 0);
-  worldUi.convertToWorldSpaceAR(probeLocal, uiToWorldPos);
-  camera.worldToScreen(uiToWorldPos, screenTmp);
-
-  const viewport = view.getViewportRect();
-  const scaleX = view.getScaleX() || 1;
-  const scaleY = view.getScaleY() || 1;
-  return {
-    x: (screenTmp.x - viewport.x) / scaleX + origin.x,
-    y: (screenTmp.y - viewport.y) / scaleY + origin.y,
-  };
-}
-
-/**
- * World 로컬 AABB(중심·반폭)가 UI 클릭을 포함하는지 — 순방향 변환만 사용합니다.
- */
-export function worldLocalAabbContainsUi(
-  uiX: number,
-  uiY: number,
-  centerLocalX: number,
-  centerLocalY: number,
-  halfW: number,
-  halfH: number,
-  cameraNode: Node,
-  worldNode: Node,
-  pad = 4,
-): boolean {
-  const corners = [
-    worldLocalToUiLocation(centerLocalX - halfW, centerLocalY - halfH, cameraNode, worldNode),
-    worldLocalToUiLocation(centerLocalX + halfW, centerLocalY - halfH, cameraNode, worldNode),
-    worldLocalToUiLocation(centerLocalX + halfW, centerLocalY + halfH, cameraNode, worldNode),
-    worldLocalToUiLocation(centerLocalX - halfW, centerLocalY + halfH, cameraNode, worldNode),
-  ];
-  let minX = corners[0].x;
-  let maxX = corners[0].x;
-  let minY = corners[0].y;
-  let maxY = corners[0].y;
-  for (let i = 1; i < corners.length; i += 1) {
-    minX = Math.min(minX, corners[i].x);
-    maxX = Math.max(maxX, corners[i].x);
-    minY = Math.min(minY, corners[i].y);
-    maxY = Math.max(maxY, corners[i].y);
-  }
-  return uiX >= minX - pad
-    && uiX <= maxX + pad
-    && uiY >= minY - pad
-    && uiY <= maxY + pad;
-}
-
-/**
- * getUILocation → World 노드 로컬 픽셀(청크·NPC·자원 히트박스와 동일 공간).
- *
- * 줌 ≈ 1: 검증된 `uiLocationToCanvasLocal`.
- * 줌 ≠ 1: 플레이어 근처에서 World→UI 2×2 매핑을 측정해 역변환.
- *          (월드 원점 프로브는 카메라가 멀리 있으면 깨짐)
- */
-export function uiLocationToWorldLocal(
-  uiX: number,
-  uiY: number,
-  cameraNode: Node,
-  worldNode: Node,
-  playerNode?: Node | null,
-): { x: number; y: number } {
-  const scaleX = worldNode.scale.x;
-  const scaleY = worldNode.scale.y;
-  if (Math.abs(scaleX - 1) < 1e-3 && Math.abs(scaleY - 1) < 1e-3) {
-    return uiLocationToCanvasLocal(uiX, uiY, cameraNode);
-  }
-
-  const anchorX = playerNode?.position.x ?? cameraNode.position.x / (scaleX || 1);
-  const anchorY = playerNode?.position.y ?? cameraNode.position.y / (scaleY || 1);
-  const probe = 256;
-  const originUi = worldLocalToUiLocation(anchorX, anchorY, cameraNode, worldNode);
-  const axisX = worldLocalToUiLocation(anchorX + probe, anchorY, cameraNode, worldNode);
-  const axisY = worldLocalToUiLocation(anchorX, anchorY + probe, cameraNode, worldNode);
-
-  const a = (axisX.x - originUi.x) / probe;
-  const c = (axisX.y - originUi.y) / probe;
-  const b = (axisY.x - originUi.x) / probe;
-  const d = (axisY.y - originUi.y) / probe;
-  const det = a * d - b * c;
-  if (Math.abs(det) < 1e-8) {
-    const safeX = Math.abs(scaleX) > 1e-6 ? scaleX : 1;
-    const safeY = Math.abs(scaleY) > 1e-6 ? scaleY : 1;
-    const canvasLocal = uiLocationToCanvasLocal(uiX, uiY, cameraNode);
-    return { x: canvasLocal.x / safeX, y: canvasLocal.y / safeY };
-  }
-
-  const dx = uiX - originUi.x;
-  const dy = uiY - originUi.y;
-  return {
-    x: anchorX + (d * dx - b * dy) / det,
-    y: anchorY + (-c * dx + a * dy) / det,
   };
 }
 

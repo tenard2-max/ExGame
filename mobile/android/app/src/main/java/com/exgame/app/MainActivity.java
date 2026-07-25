@@ -1,17 +1,18 @@
 package com.exgame.app;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.content.ActivityNotFoundException;
+import android.content.Intent;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.Gravity;
-import android.widget.FrameLayout;
-import android.widget.LinearLayout;
-import android.widget.ProgressBar;
-import android.widget.TextView;
 import android.webkit.ConsoleMessage;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -19,6 +20,10 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -30,19 +35,20 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 게임은 즉시 APK 내장(www)으로 실행합니다.
- * GitHub OTA는 백그라운드에서만 받으며, 다음 실행부터 적용합니다.
- * (업데이트 대기 중 하얀 화면 고정을 막기 위함. PAT 불필요.)
+ * GitHub OTA는 백그라운드에서만 받습니다.
+ * WebView 파일 선택(오디오 불러오기)은 onShowFileChooser 로 처리합니다.
+ * (저장소 권한 없이 시스템 문서 UI 사용)
  */
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "ExGameMain";
+    private static final int FILE_CHOOSER_REQUEST = 4101;
     private static final String GAME_URL =
             "https://appassets.androidplatform.net/assets/www/index.html"
                     + "?offline=1&fullscreen=1&mobile=1";
 
     /**
      * true 이면 검증된 OTA www 를 로드합니다.
-     * 0.1.3: 깨진 OTA로 하얀 화면이 재발하지 않도록 당분간 APK 내장만 사용.
-     * (백그라운드 다운로드는 계속하며, 안정화 후 true 로 전환)
+     * 당분간 APK 내장만 사용 (하얀 화면 재발 방지).
      */
     private static final boolean LOAD_OTA_WWW = false;
 
@@ -54,6 +60,8 @@ public class MainActivity extends AppCompatActivity {
     private final ExecutorService updateWorker = Executors.newSingleThreadExecutor();
     private final AtomicReference<WebViewAssetLoader> assetLoaderRef = new AtomicReference<>();
     private GameUpdateManager updater;
+    @Nullable
+    private ValueCallback<Uri[]> filePathCallback;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -82,12 +90,10 @@ public class MainActivity extends AppCompatActivity {
                 getString(R.string.github_owner),
                 getString(R.string.github_repo)
         );
-        // 이전에 깨진 OTA가 하얀 화면을 만들면 지우고 내장본으로 복구
         updater.discardBrokenOtaIfNeeded();
         updater.wipeOtaOnce("wipe_ota_v013");
 
         configureWebView();
-        // 이번 세션 로더: 기본은 APK assets (OTA 로드는 플래그로 제어)
         installAssetLoader(LOAD_OTA_WWW && updater.hasOtaWww());
         startGameNow();
         startBackgroundUpdate();
@@ -149,10 +155,13 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
-                // 페이지가 뜨면 오버레이 제거 (Cocos 스플래시가 이어받음)
-                mainHandler.postDelayed(() -> statusPanel.setVisibility(android.view.View.GONE), 300);
+                mainHandler.postDelayed(
+                        () -> statusPanel.setVisibility(android.view.View.GONE),
+                        300
+                );
             }
         });
+
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onConsoleMessage(ConsoleMessage consoleMessage) {
@@ -160,6 +169,40 @@ public class MainActivity extends AppCompatActivity {
                         + " @" + consoleMessage.sourceId()
                         + ":" + consoleMessage.lineNumber());
                 return super.onConsoleMessage(consoleMessage);
+            }
+
+            /**
+             * &lt;input type="file"&gt; (오디오 파일 추가)용.
+             * 시스템 문서 선택기를 쓰므로 READ_EXTERNAL_STORAGE 불필요.
+             */
+            @Override
+            public boolean onShowFileChooser(
+                    WebView webView,
+                    ValueCallback<Uri[]> filePathCallback,
+                    FileChooserParams fileChooserParams
+            ) {
+                if (MainActivity.this.filePathCallback != null) {
+                    MainActivity.this.filePathCallback.onReceiveValue(null);
+                }
+                MainActivity.this.filePathCallback = filePathCallback;
+
+                Intent intent = fileChooserParams.createIntent();
+                try {
+                    // 오디오 MIME 이 비어 있으면 보완
+                    String[] accept = fileChooserParams.getAcceptTypes();
+                    boolean hasAccept = accept != null && accept.length > 0
+                            && accept[0] != null && !accept[0].isEmpty();
+                    if (!hasAccept) {
+                        intent.setType("audio/*");
+                    }
+                    startActivityForResult(intent, FILE_CHOOSER_REQUEST);
+                } catch (ActivityNotFoundException e) {
+                    Log.w(TAG, "file chooser not found", e);
+                    MainActivity.this.filePathCallback = null;
+                    filePathCallback.onReceiveValue(null);
+                    return false;
+                }
+                return true;
             }
         });
 
@@ -171,7 +214,28 @@ public class MainActivity extends AppCompatActivity {
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
         settings.setAllowFileAccess(true);
+        settings.setAllowContentAccess(true);
+        settings.setSupportZoom(false);
+        settings.setBuiltInZoomControls(false);
+        settings.setDisplayZoomControls(false);
         settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        if (requestCode == FILE_CHOOSER_REQUEST) {
+            Uri[] result = null;
+            if (filePathCallback != null) {
+                if (resultCode == Activity.RESULT_OK) {
+                    result = WebChromeClient.FileChooserParams.parseResult(resultCode, data);
+                }
+                filePathCallback.onReceiveValue(result);
+                filePathCallback = null;
+            }
+            return;
+        }
+        super.onActivityResult(requestCode, resultCode, data);
     }
 
     private void installAssetLoader(boolean useOta) {
@@ -195,7 +259,6 @@ public class MainActivity extends AppCompatActivity {
     private void startGameNow() {
         statusText.setText("게임 시작 중…");
         webView.loadUrl(GAME_URL);
-        // 페이지 콜백이 없어도 2초 뒤 오버레이는 걷어 하얀 고정 방지
         mainHandler.postDelayed(() -> statusPanel.setVisibility(android.view.View.GONE), 2000);
     }
 
@@ -211,7 +274,7 @@ public class MainActivity extends AppCompatActivity {
 
                             @Override
                             public void onProgress(int percentOrMinusOne) {
-                                // 백그라운드 — UI 막지 않음
+                                // background only
                             }
                         }
                 );
@@ -236,6 +299,10 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        if (filePathCallback != null) {
+            filePathCallback.onReceiveValue(null);
+            filePathCallback = null;
+        }
         updateWorker.shutdownNow();
         if (webView != null) {
             webView.destroy();

@@ -373,7 +373,7 @@ export class SaveSessionController extends Component {
       await this.chunkManager!.flushAndUnloadAll();
       const worldSeed = createNewWorldSeed();
       this.chunkManager!.setWorldSeed(worldSeed);
-      this.inventory!.resetForNewGame(100);
+      this.inventory!.resetForNewGame(10);
       this.playerStats!.resetForNewGame();
       this.teleportWaypoints?.clear();
       this.gears?.clear();

@@ -259,7 +259,10 @@ export class GameBootstrap extends Component {
     teleportWaypoints.loadFromState(saveGame.player.teleportWaypoints);
     gears.loadFromState(saveGame.player.gearState);
     bankAccount.loadFromState(saveGame.player.bankState);
-    inventory.ensureStarterGear(100);
+    // 매 부팅마다 장비를 100개로 채우지 않음. 빈 인벤(신규)일 때만 초급 포션 10개.
+    if (inventory.listOwnedStacks().length === 0) {
+      inventory.ensureStarterGear(10);
+    }
 
     const generator = new DefaultWorldGenerator(
       new DefaultSeedDeriver(),

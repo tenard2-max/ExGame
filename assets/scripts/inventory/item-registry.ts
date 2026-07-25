@@ -199,10 +199,9 @@ export const EQUIPABLE_ARMOR_IDS: ReadonlyArray<ItemId> = [
   'armor-plate',
 ];
 
-/** 신규 캐릭터/테스트용 지급 아이템. */
+/** 신규 캐릭터 지급: 초급 포션만. */
 export const STARTER_GEAR_ITEM_IDS: ReadonlyArray<ItemId> = [
-  ...EQUIPABLE_WEAPON_IDS,
-  ...EQUIPABLE_ARMOR_IDS,
+  'potion-basic',
 ];
 
 export function isEquipableWeapon(itemId: ItemId): boolean {

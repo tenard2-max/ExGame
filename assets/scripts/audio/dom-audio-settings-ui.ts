@@ -44,11 +44,23 @@ export class DomAudioSettingsUi {
     return this.audioOpen && this.overlay !== null;
   }
 
+  /** 게임 설정 / 오디오 버튼 텍스트 (모바일은 짧게). */
+  private gearLabel(kind: 'settings' | 'audio', open: boolean): string {
+    const mobile = typeof document !== 'undefined'
+      && document.body.classList.contains('exgame-mobile');
+    if (kind === 'settings') {
+      if (!open) return '설정';
+      return mobile ? '설정닫기' : '설정 닫기';
+    }
+    if (!open) return '오디오';
+    return mobile ? '오디오닫기' : '오디오 닫기';
+  }
+
   /** 게임 설정 패널 열림 상태만 버튼 표시에 반영합니다. */
   setGameSettingsOpen(open: boolean): void {
     this.gameSettingsOpen = open;
     if (this.settingsButton) {
-      this.settingsButton.textContent = open ? '설정 닫기' : '설정';
+      this.settingsButton.textContent = this.gearLabel('settings', open);
       this.settingsButton.classList.toggle('is-open', open);
     }
   }
@@ -57,7 +69,7 @@ export class DomAudioSettingsUi {
   setAudioOpen(open: boolean): void {
     this.audioOpen = open;
     if (this.audioButton) {
-      this.audioButton.textContent = open ? '오디오 닫기' : '오디오';
+      this.audioButton.textContent = this.gearLabel('audio', open);
       this.audioButton.classList.toggle('is-open', open);
     }
     if (open) this.showOverlay();
@@ -346,12 +358,21 @@ body.exgame-mobile .exgame-settings-stack {
   gap: 5px;
 }
 body.exgame-mobile .exgame-dom-gear {
-  width: 44px;
+  width: 70px;
   height: 28px;
   border-width: 2px;
   border-radius: 8px;
   font-size: 9px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  padding: 0 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+body.exgame-mobile .exgame-dom-audio-btn {
+  /* 오디오/오디오 닫기 텍스트용 — 기본 대비 약 60% 더 길게 */
+  width: 70px;
+  min-width: 70px;
 }
 .exgame-dom-audio-btn {
   border-color: #7ec8ff;

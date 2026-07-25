@@ -20,7 +20,7 @@ export type InventoryListener = (model: InventoryModel) => void;
 const DEFAULT_CAPACITY = 40;
 export const LYCANTHROPE_SWORD_DROP_CHANCE = 0.03;
 export const ELDER_LIZARDMAN_SWORD_DROP_CHANCE = 0.03;
-export const STARTER_GEAR_QUANTITY = 100;
+export const STARTER_GEAR_QUANTITY = 10;
 
 /**
  * 스택 기반 소지품 모델입니다.
@@ -89,14 +89,14 @@ export class InventoryModel {
     if (need > 0) this.add(itemId, need);
   }
 
-  /** 검·갑옷 스타터 세트를 목표 수량으로 맞춥니다. */
+  /** 초급 포션 등 스타터 아이템을 목표 수량으로 맞춥니다. */
   ensureStarterGear(quantity = STARTER_GEAR_QUANTITY): void {
     for (const itemId of STARTER_GEAR_ITEM_IDS) {
       this.ensureQuantity(itemId, quantity);
     }
   }
 
-  /** 소지품·장착을 비우고 스타터 장비를 지급합니다. */
+  /** 소지품·장착을 비우고 스타터(초급 포션)만 지급합니다. */
   resetForNewGame(starterQuantity = STARTER_GEAR_QUANTITY): void {
     this.quantities.clear();
     this.equippedWeaponId = DEFAULT_WEAPON_ITEM_ID;

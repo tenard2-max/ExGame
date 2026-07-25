@@ -13,22 +13,27 @@ const PORTRAIT_FILES: Record<NpcPortraitId, string> = {
 };
 
 /** 초상화 캐시 무효화(파일 교체 시 숫자만 올리면 됩니다). */
-const PORTRAIT_CACHE_VERSION = '5';
+const PORTRAIT_CACHE_VERSION = '6';
 
 const SHELL_STYLE_ID = 'exgame-npc-dialogue-shell-style';
 
-/** 월드 타일 1칸(px). 대화 UI 오프셋에 사용합니다. */
-const TILE_PX = 32;
-/** 좌측 초상화 → 캐릭터(화면 중앙) 쪽 이동량. */
-const PORTRAIT_SHIFT_TOWARD_CHARACTER_PX = 6 * TILE_PX;
-/** 우측 UI 패널 → 캐릭터(화면 중앙) 쪽 이동량. */
-const PANEL_SHIFT_TOWARD_CHARACTER_PX = 3 * TILE_PX;
+/** 데스크톱에서만 살짝 중앙으로 당깁니다(모바일은 잘림 방지로 0). */
+const PORTRAIT_SHIFT_DESKTOP_PX = 48;
+const PANEL_SHIFT_DESKTOP_PX = 32;
 
-/** 빌드 산출물 `/ui/portraits/*.png` 경로(쿼리 무시, 오리진 기준). */
+/**
+ * 빌드 산출물 `ui/portraits/*.png`.
+ * origin 절대경로(`/ui/...`)는 Android WebView(`.../assets/www/`)에서 깨지므로
+ * 문서 기준 상대경로를 씁니다.
+ */
 export function getNpcPortraitUrl(portraitId: NpcPortraitId): string {
   const file = PORTRAIT_FILES[portraitId];
-  const origin = globalThis.location?.origin ?? '';
-  return `${origin}/ui/portraits/${file}?v=${PORTRAIT_CACHE_VERSION}`;
+  try {
+    const base = new URL('.', globalThis.location?.href ?? 'https://local/');
+    return new URL(`ui/portraits/${file}?v=${PORTRAIT_CACHE_VERSION}`, base).href;
+  } catch {
+    return `./ui/portraits/${file}?v=${PORTRAIT_CACHE_VERSION}`;
+  }
 }
 
 /**
@@ -42,20 +47,6 @@ export function wrapNpcDialogueShell(
 ): string {
   ensureNpcDialogueShellStyle();
   const src = escapeAttr(getNpcPortraitUrl(portraitId));
-  // 인라인 스타일로 시트 충돌·max-height % 붕괴를 막습니다.
-  const imgStyle = [
-    'display:block',
-    'max-width:min(100%,46vw)',
-    'max-height:88vh',
-    'width:auto',
-    'height:auto',
-    'object-fit:contain',
-    'object-position:center center',
-    `transform:translateX(${PORTRAIT_SHIFT_TOWARD_CHARACTER_PX}px)`,
-    'pointer-events:none',
-    'user-select:none',
-    '-webkit-user-select:none',
-  ].join(';');
   return `
     <div class="exgame-npc-shell">
       <div class="exgame-npc-portrait-col">
@@ -63,7 +54,6 @@ export function wrapNpcDialogueShell(
           class="exgame-npc-portrait"
           src="${src}"
           alt="${escapeAttr(altLabel)}"
-          style="${imgStyle}"
           decoding="async"
           draggable="false"
         />
@@ -95,7 +85,7 @@ export const NPC_DIALOGUE_SHELL_CSS = `
     width: 100%;
     height: 100%;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
     align-items: stretch;
     gap: 0;
     padding: 0;
@@ -108,19 +98,20 @@ export const NPC_DIALOGUE_SHELL_CSS = `
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 3vh 2vw;
+    padding: 2vh 1vw 2vh 2vw;
     box-sizing: border-box;
     pointer-events: none;
+    overflow: hidden;
   }
   .exgame-npc-portrait {
     display: block !important;
-    max-width: min(100%, 46vw) !important;
-    max-height: 88vh !important;
+    max-width: 100% !important;
+    max-height: 86vh !important;
     width: auto !important;
     height: auto !important;
     object-fit: contain !important;
-    object-position: center center;
-    transform: translateX(${PORTRAIT_SHIFT_TOWARD_CHARACTER_PX}px) !important;
+    object-position: center bottom;
+    transform: translateX(${PORTRAIT_SHIFT_DESKTOP_PX}px);
     opacity: 1 !important;
     visibility: visible !important;
     pointer-events: none;
@@ -133,38 +124,63 @@ export const NPC_DIALOGUE_SHELL_CSS = `
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 3vh 2vw;
+    padding: 2vh 2vw 2vh 1vw;
     box-sizing: border-box;
     pointer-events: none;
+    overflow: hidden;
   }
   .exgame-npc-panel-col > * {
-    width: min(100%, 640px);
-    max-height: min(88vh, 900px);
-    transform: translateX(-${PANEL_SHIFT_TOWARD_CHARACTER_PX}px);
+    width: min(100%, 480px);
+    max-width: 42vw;
+    max-height: min(86vh, 820px);
+    transform: translateX(-${PANEL_SHIFT_DESKTOP_PX}px);
     pointer-events: auto;
+    box-sizing: border-box;
   }
-  @media (max-width: 820px) {
+
+  @media (max-height: 520px), (max-width: 900px) {
     .exgame-npc-shell {
-      grid-template-columns: 1fr;
-      grid-template-rows: minmax(0, 38vh) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     }
     .exgame-npc-portrait-col {
-      padding: 1.5vh 3vw 0;
+      padding: 1vh 0.5vw 1vh 1vw;
     }
     .exgame-npc-portrait {
-      max-width: 90vw !important;
-      max-height: 34vh !important;
+      max-height: 78vh !important;
       transform: none !important;
     }
     .exgame-npc-panel-col {
-      padding: 1vh 3vw 2vh;
-      align-items: center;
+      padding: 1vh 1.5vw 1vh 0.5vw;
+      justify-content: flex-end;
     }
     .exgame-npc-panel-col > * {
-      width: min(100%, 96vw);
-      max-height: min(56vh, 900px);
-      transform: none;
+      width: min(100%, 360px) !important;
+      max-width: min(46vw, 380px) !important;
+      max-height: min(82vh, 640px) !important;
+      transform: none !important;
     }
+  }
+
+  body.exgame-mobile .exgame-npc-shell {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  body.exgame-mobile .exgame-npc-portrait-col {
+    padding: 1vh 0.5vw;
+  }
+  body.exgame-mobile .exgame-npc-portrait {
+    max-width: 100% !important;
+    max-height: 82vh !important;
+    transform: none !important;
+  }
+  body.exgame-mobile .exgame-npc-panel-col {
+    padding: 1vh 1.5vw 1vh 0.5vw;
+    justify-content: flex-end;
+  }
+  body.exgame-mobile .exgame-npc-panel-col > * {
+    width: min(100%, 340px) !important;
+    max-width: min(44vw, 360px) !important;
+    max-height: min(84vh, 620px) !important;
+    transform: none !important;
   }
 `;
 

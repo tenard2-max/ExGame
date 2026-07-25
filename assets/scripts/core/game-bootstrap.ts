@@ -19,6 +19,7 @@ import { UnifiedInput } from '../input/unified-input';
 import { InventoryModel } from '../inventory/inventory-model';
 import { BlockInteractionController } from '../player/block-interaction-controller';
 import { CameraFollow } from '../player/camera-follow';
+import { WorldPinchZoom } from '../player/world-pinch-zoom';
 import { PlayerController } from '../player/player-controller';
 import {
   PLAYER_COLLISION_HALF,
@@ -458,11 +459,17 @@ export class GameBootstrap extends Component {
     // 다른 HUD보다 위에 그려 톱니가 가려지지 않게 합니다.
     settingsHudNode.setSiblingIndex(this.node.children.length - 1);
 
+    cameraNode.addComponent(CameraFollow).configure(playerNode);
+    const pinchZoom = this.node.addComponent(WorldPinchZoom);
+    pinchZoom.configure(worldNode, inputController);
+
     const mobileControls = new DomMobileControlsUi();
     mobileControls.mount(
       inputController,
       () => inventoryHud.toggleFromUi(),
       () => potionHud.toggleFromUi(),
+      () => pinchZoom.adjustZoom(0.2),
+      () => pinchZoom.adjustZoom(-0.2),
     );
 
     this.node.addComponent(BlockInteractionController).configure(
@@ -549,8 +556,6 @@ export class GameBootstrap extends Component {
         });
       },
     );
-
-    cameraNode.addComponent(CameraFollow).configure(playerNode);
 
     const firstSample = generator.generateChunk(worldSeed, { x: 0, y: 0 });
     const secondSample = generator.generateChunk(worldSeed, { x: 0, y: 0 });

@@ -89,6 +89,17 @@ export class UnifiedInput extends Component {
   }
 
   /**
+   * 핀치 줌 등 두 손가락 제스처가 시작되면 이동/탭/채집 제스처를 취소합니다.
+   */
+  cancelPointerGesture(): void {
+    this.activeTouchId = null;
+    this.isMouseDragging = false;
+    this.hasPendingTap = false;
+    this.pointerMaxDistance = 0;
+    this.pointerCurrent.set(this.pointerStart);
+  }
+
+  /**
    * 드래그 없이 짧게 눌렀다 뗀 탭을 1회 소비합니다.
    * 마우스 클릭과 터치 탭이 동일하게 처리됩니다.
    */

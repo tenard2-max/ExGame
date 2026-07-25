@@ -12,18 +12,24 @@ export class DomMobileControlsUi {
   private input: UnifiedInput | null = null;
   private onToggleInventory: (() => void) | null = null;
   private onTogglePotion: (() => void) | null = null;
+  private onZoomIn: (() => void) | null = null;
+  private onZoomOut: (() => void) | null = null;
   private activeDirs = new Set<'up' | 'down' | 'left' | 'right'>();
 
   mount(
     input: UnifiedInput,
     onToggleInventory: () => void,
     onTogglePotion: () => void,
+    onZoomIn?: () => void,
+    onZoomOut?: () => void,
   ): void {
     this.destroy();
     if (!isMobileShell()) return;
     this.input = input;
     this.onToggleInventory = onToggleInventory;
     this.onTogglePotion = onTogglePotion;
+    this.onZoomIn = onZoomIn ?? null;
+    this.onZoomOut = onZoomOut ?? null;
     this.ensureStyle();
     this.build();
   }
@@ -36,6 +42,8 @@ export class DomMobileControlsUi {
     this.input = null;
     this.onToggleInventory = null;
     this.onTogglePotion = null;
+    this.onZoomIn = null;
+    this.onZoomOut = null;
   }
 
   private build(): void {
@@ -69,6 +77,32 @@ export class DomMobileControlsUi {
 
     actions.appendChild(itemBtn);
     actions.appendChild(potionBtn);
+
+    const zoomRow = document.createElement('div');
+    zoomRow.className = 'exgame-mobile-zoom';
+    const zoomOut = document.createElement('button');
+    zoomOut.type = 'button';
+    zoomOut.className = 'exgame-mobile-zoom-btn';
+    zoomOut.textContent = '−';
+    zoomOut.setAttribute('aria-label', '축소');
+    zoomOut.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.onZoomOut?.();
+    });
+    const zoomIn = document.createElement('button');
+    zoomIn.type = 'button';
+    zoomIn.className = 'exgame-mobile-zoom-btn';
+    zoomIn.textContent = '+';
+    zoomIn.setAttribute('aria-label', '확대');
+    zoomIn.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.onZoomIn?.();
+    });
+    zoomRow.appendChild(zoomOut);
+    zoomRow.appendChild(zoomIn);
+    actions.appendChild(zoomRow);
 
     const pad = document.createElement('div');
     pad.className = 'exgame-dpad';
@@ -175,6 +209,25 @@ export class DomMobileControlsUi {
   font-weight: 700;
   cursor: pointer;
   font-family: "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+}
+#${ROOT_ID} .exgame-mobile-zoom {
+  display: flex;
+  gap: 6px;
+  pointer-events: none;
+}
+#${ROOT_ID} .exgame-mobile-zoom-btn {
+  pointer-events: auto !important;
+  width: 33px;
+  height: 36px;
+  border: 2px solid #c8e0a8;
+  border-radius: 10px;
+  background: rgba(28, 38, 52, 0.92);
+  color: #e8ffc8;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
   box-shadow: 0 3px 10px rgba(0,0,0,0.35);
 }
 #${ROOT_ID} .exgame-dpad {

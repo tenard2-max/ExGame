@@ -7,8 +7,8 @@ export const DESIGN_HEIGHT = 1440;
 
 const uiToScreenPos = new Vec3();
 const uiToWorldPos = new Vec3();
-const canvasArPos = new Vec3();
-const worldLocalPos = new Vec3();
+const probeLocal = new Vec3();
+const screenTmp = new Vec3();
 
 /**
  * getUILocation(가시 영역) → 디자인 좌표(2560×1440)로 변환합니다.
@@ -69,59 +69,78 @@ export function uiLocationToCanvasLocal(
 }
 
 /**
+ * World 로컬 픽셀 → getUILocation 과 동일 공간.
+ * 렌더 경로(World UITransform → Camera.worldToScreen)라 줌과 스프라이트 위치가 일치합니다.
+ */
+export function worldLocalToUiLocation(
+  localX: number,
+  localY: number,
+  cameraNode: Node,
+  worldNode: Node,
+): { x: number; y: number } {
+  const camera = cameraNode.getComponent(Camera);
+  const worldUi = worldNode.getComponent(UITransform);
+  const origin = view.getVisibleOrigin();
+  if (!camera || !worldUi) {
+    const visible = view.getVisibleSize();
+    return {
+      x: origin.x + localX * (worldNode.scale.x || 1)
+        - cameraNode.position.x + visible.width / 2,
+      y: origin.y + localY * (worldNode.scale.y || 1)
+        - cameraNode.position.y + visible.height / 2,
+    };
+  }
+
+  probeLocal.set(localX, localY, 0);
+  worldUi.convertToWorldSpaceAR(probeLocal, uiToWorldPos);
+  camera.worldToScreen(uiToWorldPos, screenTmp);
+
+  const viewport = view.getViewportRect();
+  const scaleX = view.getScaleX() || 1;
+  const scaleY = view.getScaleY() || 1;
+  return {
+    x: (screenTmp.x - viewport.x) / scaleX + origin.x,
+    y: (screenTmp.y - viewport.y) / scaleY + origin.y,
+  };
+}
+
+/**
  * getUILocation → World 노드 로컬 픽셀(청크·NPC·자원 히트박스와 동일 공간).
  *
- * - 줌 ≈ 1.0: 기존에 검증된 `uiLocationToCanvasLocal` 그대로 (클릭 복구).
- * - 줌 ≠ 1.0: CameraFollow와 동일한 Canvas AR 공간으로 올린 뒤 World.scale로 나눔.
- *   (canvas.worldPosition 단순 차감 값을 scale로 나누면 AlignCanvas에서 어긋남)
- *
- * hitbox 자체는 확대/축소하지 않습니다. HUD는 normalizeUiToDesign 을 유지하세요.
+ * 줌 ≈ 1: 검증된 `uiLocationToCanvasLocal`.
+ * 줌 ≠ 1: World→UI 순방향(렌더와 동일)을 프로브로 측정한 아핀 역변환.
+ *          screenToWorld 역경로만 쓰면 AlignCanvas + World.scale 에서 클릭이 빗나갑니다.
+ * hitbox 숫자는 줌으로 키우지 않습니다.
  */
 export function uiLocationToWorldLocal(
   uiX: number,
   uiY: number,
   cameraNode: Node,
   worldNode: Node,
+  _playerNode?: Node | null,
 ): { x: number; y: number } {
   const scaleX = worldNode.scale.x;
   const scaleY = worldNode.scale.y;
-  const unzoomed = Math.abs(scaleX - 1) < 1e-3 && Math.abs(scaleY - 1) < 1e-3;
-  if (unzoomed) {
+  if (Math.abs(scaleX - 1) < 1e-3 && Math.abs(scaleY - 1) < 1e-3) {
     return uiLocationToCanvasLocal(uiX, uiY, cameraNode);
   }
 
-  const camera = cameraNode.getComponent(Camera);
-  const canvas = cameraNode.parent;
-  const canvasUi = canvas?.getComponent(UITransform);
-  if (!camera || !canvasUi) {
-    return uiLocationToCanvasLocal(uiX, uiY, cameraNode);
-  }
+  const PROBE = 4096;
+  const originUi = worldLocalToUiLocation(0, 0, cameraNode, worldNode);
+  const axisX = worldLocalToUiLocation(PROBE, 0, cameraNode, worldNode);
+  const axisY = worldLocalToUiLocation(0, PROBE, cameraNode, worldNode);
+  const effX = (axisX.x - originUi.x) / PROBE;
+  const effY = (axisY.y - originUi.y) / PROBE;
+  const safeX = Math.abs(effX) > 1e-6
+    ? effX
+    : (Math.abs(scaleX) > 1e-6 ? scaleX : 1);
+  const safeY = Math.abs(effY) > 1e-6
+    ? effY
+    : (Math.abs(scaleY) > 1e-6 ? scaleY : 1);
 
-  const origin = view.getVisibleOrigin();
-  const viewport = view.getViewportRect();
-  const viewScaleX = view.getScaleX() || 1;
-  const viewScaleY = view.getScaleY() || 1;
-  uiToScreenPos.set(
-    (uiX - origin.x) * viewScaleX + viewport.x,
-    (uiY - origin.y) * viewScaleY + viewport.y,
-    0,
-  );
-  camera.screenToWorld(uiToScreenPos, uiToWorldPos);
-  // CameraFollow 가 쓰는 것과 동일: Canvas AR 로컬
-  canvasUi.convertToNodeSpaceAR(uiToWorldPos, canvasArPos);
-
-  const worldUi = worldNode.getComponent(UITransform);
-  if (worldUi) {
-    canvasUi.convertToWorldSpaceAR(canvasArPos, uiToWorldPos);
-    worldUi.convertToNodeSpaceAR(uiToWorldPos, worldLocalPos);
-    return { x: worldLocalPos.x, y: worldLocalPos.y };
-  }
-
-  const safeX = Math.abs(scaleX) > 1e-6 ? scaleX : 1;
-  const safeY = Math.abs(scaleY) > 1e-6 ? scaleY : 1;
   return {
-    x: (canvasArPos.x - worldNode.position.x) / safeX,
-    y: (canvasArPos.y - worldNode.position.y) / safeY,
+    x: (uiX - originUi.x) / safeX,
+    y: (uiY - originUi.y) / safeY,
   };
 }
 

@@ -932,6 +932,7 @@ export class BlockInteractionController extends Component {
       uiLocation.y,
       this.cameraNode!,
       world,
+      this.playerNode,
     );
   }
 

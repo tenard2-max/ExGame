@@ -140,31 +140,45 @@ Reinstall the APK only when the native shell changes.
 "@
 }
 
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 & $ghCmd repo view "$Owner/$Repo" 2>$null | Out-Null
-if ($LASTEXITCODE -ne 0) {
+$repoMissing = ($LASTEXITCODE -ne 0)
+$ErrorActionPreference = $prevEap
+if ($repoMissing) {
     Write-Host "Creating repo: $Owner/$Repo"
+    $ErrorActionPreference = "Continue"
     & $ghCmd repo create "$Owner/$Repo" --public --source $projectPath --remote origin --push
-    if ($LASTEXITCODE -ne 0) {
+    $createCode = $LASTEXITCODE
+    $ErrorActionPreference = "Stop"
+    if ($createCode -ne 0) {
         throw "gh repo create failed. Run: tools\gh\gh.exe auth login"
     }
 }
 
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 & $ghCmd release view $tag --repo "$Owner/$Repo" 2>$null | Out-Null
 $releaseExists = ($LASTEXITCODE -eq 0)
+$ErrorActionPreference = $prevEap
 $assets = @($versionJsonPath, $wwwZipPath)
 if (Test-Path -LiteralPath $pcZip) { $assets += $pcZip }
 if (Test-Path -LiteralPath $apkPath) { $assets += $apkPath }
 
-if ($releaseExists) {
-    Write-Host "Uploading assets to existing release $tag"
-    & $ghCmd release upload $tag @assets --repo "$Owner/$Repo" --clobber
-} else {
-    Write-Host "Creating release $tag"
-    & $ghCmd release create $tag @assets --repo "$Owner/$Repo" --title "ExGame $tag" --notes $Notes
-}
-
-if ($LASTEXITCODE -ne 0) {
-    throw "gh release failed"
+$ErrorActionPreference = "Continue"
+try {
+    if ($releaseExists) {
+        Write-Host "Uploading assets to existing release $tag"
+        & $ghCmd release upload $tag @assets --repo "$Owner/$Repo" --clobber
+    } else {
+        Write-Host "Creating release $tag"
+        & $ghCmd release create $tag @assets --repo "$Owner/$Repo" --title "ExGame $tag" --notes $Notes
+    }
+    if ($LASTEXITCODE -ne 0) {
+        throw "gh release failed"
+    }
+} finally {
+    $ErrorActionPreference = "Stop"
 }
 
 Write-Host "Done: https://github.com/$Owner/$Repo/releases/tag/$tag"

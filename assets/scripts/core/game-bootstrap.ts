@@ -373,7 +373,11 @@ export class GameBootstrap extends Component {
       .configure(playerNode, chunkManager);
 
     const cameraNode = this.node.getChildByName('Camera');
-    if (!cameraNode) return;
+    if (!cameraNode) {
+      console.error('[ExGame] Camera node missing — abort bootstrap');
+      await splash.waitMinimumThenHide(SPLASH_MIN_DURATION_MS);
+      return;
+    }
 
     const hotbarNode = new Node('HotbarHud');
     hotbarNode.layer = Layers.Enum.UI_2D;

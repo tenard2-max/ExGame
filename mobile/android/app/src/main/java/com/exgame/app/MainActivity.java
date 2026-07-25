@@ -91,7 +91,7 @@ public class MainActivity extends AppCompatActivity {
                 getString(R.string.github_repo)
         );
         updater.discardBrokenOtaIfNeeded();
-        updater.wipeOtaOnce("wipe_ota_v013");
+        updater.wipeOtaOnce("wipe_ota_v015");
 
         configureWebView();
         installAssetLoader(LOAD_OTA_WWW && updater.hasOtaWww());

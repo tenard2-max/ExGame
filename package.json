@@ -1,8 +1,9 @@
-{
+﻿{
   "name": "exgame",
   "uuid": "c87d4a8e-8e20-4a2d-9b67-6d67c95ea823",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "creator": {
     "version": "3.8.8"
   }
 }
+

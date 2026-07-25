@@ -28,11 +28,15 @@ export class DomSplashUi {
     root.setAttribute('aria-label', 'ARK MINING');
     root.innerHTML = `
       <img class="exgame-splash-img" alt="ARK MINING" draggable="false" />
-      <div id="${HINT_ID}" class="exgame-splash-hint" hidden>클릭하여 시작</div>
+      <div id="${HINT_ID}" class="exgame-splash-hint">로딩 중…</div>
     `;
     const img = root.querySelector('img') as HTMLImageElement;
     img.src = new URL(imageUrl, globalThis.location.href).href;
     img.addEventListener('dragstart', (event) => event.preventDefault());
+    img.addEventListener('error', () => {
+      // 이미지 실패해도 어두운 스플래시 + 문구는 유지
+      img.style.display = 'none';
+    });
 
     root.addEventListener('pointerdown', this.onPointerDown, true);
     root.addEventListener('click', this.onClick, true);
@@ -91,7 +95,10 @@ export class DomSplashUi {
     this.canContinue = true;
     this.root.classList.add('is-ready');
     const hint = this.root.querySelector(`#${HINT_ID}`) as HTMLElement | null;
-    if (hint) hint.hidden = false;
+    if (hint) {
+      hint.hidden = false;
+      hint.textContent = '클릭하여 시작';
+    }
     this.root.focus({ preventScroll: true });
   }
 

@@ -47,8 +47,16 @@ const OGRE_TYPE_IDS = new Set<string>([
   'monster-thunder-ogre',
   'monster-ogre-king',
 ]);
+/** 하피·트롤·오우거: 다른 몬스터와 동일 톤의 붉은 실루엣 아웃라인. */
+const RED_OUTLINE_TYPE_IDS = new Set<string>([
+  ...HARPY_TYPE_IDS,
+  ...TROLL_TYPE_IDS,
+  ...OGRE_TYPE_IDS,
+]);
+const RED_OUTLINE_COLOR: readonly [number, number, number, number] = [220, 35, 35, 255];
+const RED_OUTLINE_THICKNESS = 2;
 /** atlas.png/json 교체 시 브라우저·WebView 캐시 무효화용. */
-export const MONSTER_ATLAS_CACHE_VERSION = '0.1.26';
+export const MONSTER_ATLAS_CACHE_VERSION = '0.1.27';
 
 /**
  * ./monsters/atlas.png + atlas.json 을 로드해 몬스터 SpriteFrame을 제공합니다.
@@ -107,7 +115,14 @@ export class MonsterAtlas {
     this.frames.clear();
     this.sizes.clear();
     for (const frame of data.frames) {
-      const cropped = cropFrame(image, frame);
+      let cropped = cropFrame(image, frame);
+      if (RED_OUTLINE_TYPE_IDS.has(frame.typeId)) {
+        cropped = addRedSilhouetteOutline(
+          cropped,
+          RED_OUTLINE_THICKNESS,
+          RED_OUTLINE_COLOR,
+        );
+      }
       const imageAsset = new ImageAsset(cropped);
       const texture = new Texture2D();
       texture.image = imageAsset;
@@ -116,14 +131,83 @@ export class MonsterAtlas {
 
       const spriteFrame = new SpriteFrame();
       spriteFrame.texture = texture;
-      spriteFrame.rect = new Rect(0, 0, frame.w, frame.h);
-      spriteFrame.originalSize = new Size(frame.w, frame.h);
+      spriteFrame.rect = new Rect(0, 0, cropped.width, cropped.height);
+      spriteFrame.originalSize = new Size(cropped.width, cropped.height);
       spriteFrame.packable = false;
       this.frames.set(frame.typeId, spriteFrame);
-      this.sizes.set(frame.typeId, { width: frame.w, height: frame.h });
+      this.sizes.set(frame.typeId, { width: cropped.width, height: cropped.height });
     }
     this.ready = true;
   }
+}
+
+/**
+ * 불투명 실루엣 바깥에 빨간 아웃라인을 깔고 캐릭터를 다시 올립니다.
+ * slice-monsters.py 의 add_red_silhouette_outline 과 동일 톤입니다.
+ */
+function addRedSilhouetteOutline(
+  source: HTMLCanvasElement,
+  thickness = RED_OUTLINE_THICKNESS,
+  color: readonly [number, number, number, number] = RED_OUTLINE_COLOR,
+): HTMLCanvasElement {
+  const pad = thickness + 1;
+  const width = source.width + pad * 2;
+  const height = source.height + pad * 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d');
+  if (!context) {
+    throw new Error('Failed to create 2d context for monster red outline');
+  }
+  context.imageSmoothingEnabled = false;
+  context.clearRect(0, 0, width, height);
+  context.drawImage(source, pad, pad);
+
+  const imageData = context.getImageData(0, 0, width, height);
+  const { data } = imageData;
+  const pixelCount = width * height;
+  const opaque = new Uint8Array(pixelCount);
+  for (let i = 0; i < pixelCount; i += 1) {
+    opaque[i] = data[i * 4 + 3] > 8 ? 1 : 0;
+  }
+
+  const radiusSq = thickness * thickness + 1;
+  const outline = new Uint8Array(pixelCount);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x;
+      if (opaque[index]) continue;
+      let hit = false;
+      for (let dy = -thickness; dy <= thickness && !hit; dy += 1) {
+        for (let dx = -thickness; dx <= thickness; dx += 1) {
+          if (dx === 0 && dy === 0) continue;
+          if (dx * dx + dy * dy > radiusSq) continue;
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          if (opaque[ny * width + nx]) {
+            hit = true;
+            break;
+          }
+        }
+      }
+      if (hit) outline[index] = 1;
+    }
+  }
+
+  for (let i = 0; i < pixelCount; i += 1) {
+    if (!outline[i]) continue;
+    const offset = i * 4;
+    data[offset] = color[0];
+    data[offset + 1] = color[1];
+    data[offset + 2] = color[2];
+    data[offset + 3] = color[3];
+  }
+  context.putImageData(imageData, 0, 0);
+  // 캐릭터 본체를 아웃라인 위에 다시 올려 가장자리를 덮습니다.
+  context.drawImage(source, pad, pad);
+  return canvas;
 }
 
 function cropFrame(

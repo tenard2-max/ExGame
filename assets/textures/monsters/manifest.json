@@ -150,7 +150,7 @@
                   "file":  "atlas.png",
                   "json":  "atlas.json",
                   "width":  1536,
-                  "height":  1840,
-                  "source":  "monster_atlas_harpies_trolls_ogres"
+                  "height":  1832,
+                  "source":  "monster_atlas_ogre_bg_cleared_v1"
               }
 }

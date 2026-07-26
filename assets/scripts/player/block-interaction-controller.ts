@@ -115,19 +115,19 @@ const FALLBACK_MONSTER_DISPLAY_SIZE: Readonly<
   'monster-elder-harpy': { width: 98, height: 112 },
   'monster-harpy-siren': { width: 98, height: 112 },
   'monster-harpy-queen': { width: 98, height: 112 },
-  'monster-troll': { width: 112, height: 112 },
-  'monster-elder-troll': { width: 112, height: 112 },
-  'monster-high-troll': { width: 112, height: 112 },
-  'monster-twinhead-troll': { width: 112, height: 112 },
-  'monster-blood-troll': { width: 112, height: 112 },
-  'monster-troll-king': { width: 112, height: 112 },
-  // 오우거 폴백도 기본 대비 약 30% 크게 (112*1.3≈146)
-  'monster-ogre': { width: 146, height: 146 },
-  'monster-elder-ogre': { width: 146, height: 146 },
-  'monster-twinhead-ogre': { width: 146, height: 146 },
-  'monster-blood-ogre': { width: 146, height: 146 },
-  'monster-thunder-ogre': { width: 146, height: 146 },
-  'monster-ogre-king': { width: 146, height: 146 },
+  'monster-troll': { width: 168, height: 168 },
+  'monster-elder-troll': { width: 168, height: 168 },
+  'monster-high-troll': { width: 168, height: 168 },
+  'monster-twinhead-troll': { width: 168, height: 168 },
+  'monster-blood-troll': { width: 168, height: 168 },
+  'monster-troll-king': { width: 168, height: 168 },
+  // 오우거 폴백: 기본 대비 70% 크게 (112*1.7≈190)
+  'monster-ogre': { width: 190, height: 190 },
+  'monster-elder-ogre': { width: 190, height: 190 },
+  'monster-twinhead-ogre': { width: 190, height: 190 },
+  'monster-blood-ogre': { width: 190, height: 190 },
+  'monster-thunder-ogre': { width: 190, height: 190 },
+  'monster-ogre-king': { width: 190, height: 190 },
 };
 
 export type HudMessageSink = (message: string) => void;

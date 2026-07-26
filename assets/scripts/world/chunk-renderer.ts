@@ -84,6 +84,23 @@ const MONSTER_COLORS: Readonly<Record<string, Color>> = {
   'monster-lizardman': new Color(70, 160, 70, 255),
   'monster-black-lizardman': new Color(45, 45, 50, 255),
   'monster-elder-lizardman': new Color(140, 100, 180, 255),
+  'monster-harpy': new Color(150, 110, 70, 255),
+  'monster-blood-harpy': new Color(180, 40, 50, 255),
+  'monster-elder-harpy': new Color(60, 170, 90, 255),
+  'monster-harpy-siren': new Color(50, 120, 200, 255),
+  'monster-harpy-queen': new Color(220, 180, 50, 255),
+  'monster-troll': new Color(120, 120, 110, 255),
+  'monster-elder-troll': new Color(100, 130, 90, 255),
+  'monster-high-troll': new Color(90, 90, 95, 255),
+  'monster-twinhead-troll': new Color(130, 110, 90, 255),
+  'monster-blood-troll': new Color(170, 35, 40, 255),
+  'monster-troll-king': new Color(200, 160, 40, 255),
+  'monster-ogre': new Color(70, 140, 60, 255),
+  'monster-elder-ogre': new Color(55, 120, 55, 255),
+  'monster-twinhead-ogre': new Color(40, 100, 50, 255),
+  'monster-blood-ogre': new Color(150, 45, 40, 255),
+  'monster-thunder-ogre': new Color(80, 140, 200, 255),
+  'monster-ogre-king': new Color(210, 180, 60, 255),
 };
 
 const TREASURE_COLOR = new Color(235, 195, 60, 255);

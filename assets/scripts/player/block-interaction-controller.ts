@@ -37,8 +37,23 @@ import {
 import type { GeneratedContent } from '../content/content-types';
 import type { UnifiedInput } from '../input/unified-input';
 import {
+  BLOOD_OGRE_MITHRIL_DROP_CHANCE,
+  BLOOD_TROLL_MITHRIL_DROP_CHANCE,
+  ELDER_HARPY_MITHRIL_DROP_CHANCE,
   ELDER_LIZARDMAN_SWORD_DROP_CHANCE,
+  ELDER_OGRE_MITHRIL_DROP_CHANCE,
+  ELDER_TROLL_MITHRIL_DROP_CHANCE,
+  HARPY_QUEEN_ORICHALCUM_DROP_CHANCE,
+  HARPY_SIREN_MITHRIL_DROP_CHANCE,
+  HIGH_TROLL_ORICHALCUM_DROP_CHANCE,
   LYCANTHROPE_SWORD_DROP_CHANCE,
+  OGRE_KING_ORICHALCUM_DROP_CHANCE,
+  OGRE_MITHRIL_DROP_CHANCE,
+  THUNDER_OGRE_MITHRIL_DROP_CHANCE,
+  TROLL_KING_ORICHALCUM_DROP_CHANCE,
+  TROLL_MITHRIL_DROP_CHANCE,
+  TWINHEAD_OGRE_ORICHALCUM_DROP_CHANCE,
+  TWINHEAD_TROLL_MITHRIL_DROP_CHANCE,
   type InventoryModel,
 } from '../inventory/inventory-model';
 import {
@@ -95,6 +110,24 @@ const FALLBACK_MONSTER_DISPLAY_SIZE: Readonly<
   'monster-lizardman': { width: 122, height: 102 },
   'monster-black-lizardman': { width: 122, height: 96 },
   'monster-elder-lizardman': { width: 142, height: 124 },
+  'monster-harpy': { width: 98, height: 112 },
+  'monster-blood-harpy': { width: 98, height: 112 },
+  'monster-elder-harpy': { width: 98, height: 112 },
+  'monster-harpy-siren': { width: 98, height: 112 },
+  'monster-harpy-queen': { width: 98, height: 112 },
+  'monster-troll': { width: 112, height: 112 },
+  'monster-elder-troll': { width: 112, height: 112 },
+  'monster-high-troll': { width: 112, height: 112 },
+  'monster-twinhead-troll': { width: 112, height: 112 },
+  'monster-blood-troll': { width: 112, height: 112 },
+  'monster-troll-king': { width: 112, height: 112 },
+  // 오우거 폴백도 기본 대비 약 30% 크게 (112*1.3≈146)
+  'monster-ogre': { width: 146, height: 146 },
+  'monster-elder-ogre': { width: 146, height: 146 },
+  'monster-twinhead-ogre': { width: 146, height: 146 },
+  'monster-blood-ogre': { width: 146, height: 146 },
+  'monster-thunder-ogre': { width: 146, height: 146 },
+  'monster-ogre-king': { width: 146, height: 146 },
 };
 
 export type HudMessageSink = (message: string) => void;
@@ -656,7 +689,7 @@ export class BlockInteractionController extends Component {
     return text ? ` ${text}` : '';
   }
 
-  /** 기본 드롭 + 붉은늑대 포션 / 라이칸슬롭 철검(3%). */
+  /** 기본 드롭 + 특수 몬스터 추가 드랍(포션·검·아크 등). */
   private grantMonsterRewards(
     monster: GeneratedContent,
     tile: WorldTileCoordinate,
@@ -734,6 +767,315 @@ export class BlockInteractionController extends Component {
         this.inventory.add('weapon-mithril-sword', 1);
         notes.push('미스릴검 획득!');
       }
+    }
+
+    if (monster.typeId === 'monster-blood-harpy') {
+      // 보물상자 포션 비율 ×3
+      const potionRolls = HEALTH_POTIONS.map((potion) => sampleDeterministicUnit(
+        this.worldSeed,
+        `blood-harpy-${potion.itemId}`,
+        tile.x,
+        tile.y,
+      ));
+      const potions = rollTreasurePotions(
+        potionRolls,
+        (itemId) => {
+          const potion = HEALTH_POTIONS.find((entry) => entry.itemId === itemId);
+          const base = this.balance?.getPotionDropChance(itemId)
+            ?? potion?.chestDropChance
+            ?? 0;
+          return Math.min(1, base * 3);
+        },
+      );
+      for (const potion of potions) {
+        this.inventory.add(potion.itemId, potion.quantity);
+        notes.push(`${getItemDefinition(potion.itemId).displayName}+${potion.quantity}`);
+      }
+    }
+
+    if (monster.typeId === 'monster-elder-harpy') {
+      const roll = sampleDeterministicUnit(
+        this.worldSeed,
+        'elder-harpy-mithril',
+        tile.x,
+        tile.y,
+      );
+      if (roll < ELDER_HARPY_MITHRIL_DROP_CHANCE) {
+        this.inventory.add('weapon-mithril-sword', 1);
+        notes.push('미스릴검 획득!');
+      }
+    }
+
+    if (monster.typeId === 'monster-harpy-siren') {
+      const swordRoll = sampleDeterministicUnit(
+        this.worldSeed,
+        'harpy-siren-mithril',
+        tile.x,
+        tile.y,
+      );
+      if (swordRoll < HARPY_SIREN_MITHRIL_DROP_CHANCE) {
+        this.inventory.add('weapon-mithril-sword', 1);
+        notes.push('미스릴검 획득!');
+      }
+      const oreRoll = sampleDeterministicUnit(
+        this.worldSeed,
+        'harpy-siren-ark',
+        tile.x,
+        tile.y,
+      );
+      const oreQty = 1 + Math.floor(oreRoll * 3); // 1~3
+      this.inventory.add('ark', oreQty);
+      notes.push(`아크광석+${oreQty}`);
+    }
+
+    if (monster.typeId === 'monster-harpy-queen') {
+      const swordRoll = sampleDeterministicUnit(
+        this.worldSeed,
+        'harpy-queen-orichalcum',
+        tile.x,
+        tile.y,
+      );
+      if (swordRoll < HARPY_QUEEN_ORICHALCUM_DROP_CHANCE) {
+        this.inventory.add('weapon-orichalcum-sword', 1);
+        notes.push('오리하르콘검 획득!');
+      }
+      const oreRoll = sampleDeterministicUnit(
+        this.worldSeed,
+        'harpy-queen-ark',
+        tile.x,
+        tile.y,
+      );
+      const oreQty = 2 + Math.floor(oreRoll * 4); // 2~5
+      this.inventory.add('ark', oreQty);
+      notes.push(`아크광석+${oreQty}`);
+    }
+
+    if (monster.typeId === 'monster-troll') {
+      const roll = sampleDeterministicUnit(
+        this.worldSeed,
+        'troll-mithril',
+        tile.x,
+        tile.y,
+      );
+      if (roll < TROLL_MITHRIL_DROP_CHANCE) {
+        this.inventory.add('weapon-mithril-sword', 1);
+        notes.push('미스릴검 획득!');
+      }
+    }
+
+    if (monster.typeId === 'monster-elder-troll') {
+      const roll = sampleDeterministicUnit(
+        this.worldSeed,
+        'elder-troll-mithril',
+        tile.x,
+        tile.y,
+      );
+      if (roll < ELDER_TROLL_MITHRIL_DROP_CHANCE) {
+        this.inventory.add('weapon-mithril-sword', 1);
+        notes.push('미스릴검 획득!');
+      }
+      const oreRoll = sampleDeterministicUnit(
+        this.worldSeed,
+        'elder-troll-ark',
+        tile.x,
+        tile.y,
+      );
+      const oreQty = 1 + Math.floor(oreRoll * 4); // 1~4
+      this.inventory.add('ark', oreQty);
+      notes.push(`아크광석+${oreQty}`);
+    }
+
+    if (monster.typeId === 'monster-high-troll') {
+      const roll = sampleDeterministicUnit(
+        this.worldSeed,
+        'high-troll-orichalcum',
+        tile.x,
+        tile.y,
+      );
+      if (roll < HIGH_TROLL_ORICHALCUM_DROP_CHANCE) {
+        this.inventory.add('weapon-orichalcum-sword', 1);
+        notes.push('오리하르콘검 획득!');
+      }
+      const oreRoll = sampleDeterministicUnit(
+        this.worldSeed,
+        'high-troll-ark',
+        tile.x,
+        tile.y,
+      );
+      const oreQty = 2 + Math.floor(oreRoll * 5); // 2~6
+      this.inventory.add('ark', oreQty);
+      notes.push(`아크광석+${oreQty}`);
+    }
+
+    if (monster.typeId === 'monster-twinhead-troll') {
+      const roll = sampleDeterministicUnit(
+        this.worldSeed,
+        'twinhead-troll-mithril',
+        tile.x,
+        tile.y,
+      );
+      if (roll < TWINHEAD_TROLL_MITHRIL_DROP_CHANCE) {
+        this.inventory.add('weapon-mithril-sword', 1);
+        notes.push('미스릴검 획득!');
+      }
+    }
+
+    if (monster.typeId === 'monster-blood-troll') {
+      const roll = sampleDeterministicUnit(
+        this.worldSeed,
+        'blood-troll-mithril',
+        tile.x,
+        tile.y,
+      );
+      if (roll < BLOOD_TROLL_MITHRIL_DROP_CHANCE) {
+        this.inventory.add('weapon-mithril-sword', 1);
+        notes.push('미스릴검 획득!');
+      }
+      const oreRoll = sampleDeterministicUnit(
+        this.worldSeed,
+        'blood-troll-ark',
+        tile.x,
+        tile.y,
+      );
+      const oreQty = 1 + Math.floor(oreRoll * 5); // 1~5
+      this.inventory.add('ark', oreQty);
+      notes.push(`아크광석+${oreQty}`);
+    }
+
+    if (monster.typeId === 'monster-troll-king') {
+      const roll = sampleDeterministicUnit(
+        this.worldSeed,
+        'troll-king-orichalcum',
+        tile.x,
+        tile.y,
+      );
+      if (roll < TROLL_KING_ORICHALCUM_DROP_CHANCE) {
+        this.inventory.add('weapon-orichalcum-sword', 1);
+        notes.push('오리하르콘검 획득!');
+      }
+      const oreRoll = sampleDeterministicUnit(
+        this.worldSeed,
+        'troll-king-ark',
+        tile.x,
+        tile.y,
+      );
+      const oreQty = 2 + Math.floor(oreRoll * 6); // 2~7
+      this.inventory.add('ark', oreQty);
+      notes.push(`아크광석+${oreQty}`);
+    }
+
+    if (monster.typeId === 'monster-ogre') {
+      const roll = sampleDeterministicUnit(
+        this.worldSeed,
+        'ogre-mithril',
+        tile.x,
+        tile.y,
+      );
+      if (roll < OGRE_MITHRIL_DROP_CHANCE) {
+        this.inventory.add('weapon-mithril-sword', 1);
+        notes.push('미스릴검 획득!');
+      }
+    }
+
+    if (monster.typeId === 'monster-elder-ogre') {
+      const roll = sampleDeterministicUnit(
+        this.worldSeed,
+        'elder-ogre-mithril',
+        tile.x,
+        tile.y,
+      );
+      if (roll < ELDER_OGRE_MITHRIL_DROP_CHANCE) {
+        this.inventory.add('weapon-mithril-sword', 1);
+        notes.push('미스릴검 획득!');
+      }
+      const oreRoll = sampleDeterministicUnit(
+        this.worldSeed,
+        'elder-ogre-ark',
+        tile.x,
+        tile.y,
+      );
+      const oreQty = 1 + Math.floor(oreRoll * 6); // 1~6
+      this.inventory.add('ark', oreQty);
+      notes.push(`아크광석+${oreQty}`);
+    }
+
+    if (monster.typeId === 'monster-twinhead-ogre') {
+      const roll = sampleDeterministicUnit(
+        this.worldSeed,
+        'twinhead-ogre-orichalcum',
+        tile.x,
+        tile.y,
+      );
+      if (roll < TWINHEAD_OGRE_ORICHALCUM_DROP_CHANCE) {
+        this.inventory.add('weapon-orichalcum-sword', 1);
+        notes.push('오리하르콘검 획득!');
+      }
+      const oreRoll = sampleDeterministicUnit(
+        this.worldSeed,
+        'twinhead-ogre-ark',
+        tile.x,
+        tile.y,
+      );
+      const oreQty = 2 + Math.floor(oreRoll * 7); // 2~8
+      this.inventory.add('ark', oreQty);
+      notes.push(`아크광석+${oreQty}`);
+    }
+
+    if (monster.typeId === 'monster-blood-ogre') {
+      const roll = sampleDeterministicUnit(
+        this.worldSeed,
+        'blood-ogre-mithril',
+        tile.x,
+        tile.y,
+      );
+      if (roll < BLOOD_OGRE_MITHRIL_DROP_CHANCE) {
+        this.inventory.add('weapon-mithril-sword', 1);
+        notes.push('미스릴검 획득!');
+      }
+    }
+
+    if (monster.typeId === 'monster-thunder-ogre') {
+      const roll = sampleDeterministicUnit(
+        this.worldSeed,
+        'thunder-ogre-mithril',
+        tile.x,
+        tile.y,
+      );
+      if (roll < THUNDER_OGRE_MITHRIL_DROP_CHANCE) {
+        this.inventory.add('weapon-mithril-sword', 1);
+        notes.push('미스릴검 획득!');
+      }
+      const oreRoll = sampleDeterministicUnit(
+        this.worldSeed,
+        'thunder-ogre-ark',
+        tile.x,
+        tile.y,
+      );
+      const oreQty = 1 + Math.floor(oreRoll * 7); // 1~7
+      this.inventory.add('ark', oreQty);
+      notes.push(`아크광석+${oreQty}`);
+    }
+
+    if (monster.typeId === 'monster-ogre-king') {
+      const roll = sampleDeterministicUnit(
+        this.worldSeed,
+        'ogre-king-orichalcum',
+        tile.x,
+        tile.y,
+      );
+      if (roll < OGRE_KING_ORICHALCUM_DROP_CHANCE) {
+        this.inventory.add('weapon-orichalcum-sword', 1);
+        notes.push('오리하르콘검 획득!');
+      }
+      const oreRoll = sampleDeterministicUnit(
+        this.worldSeed,
+        'ogre-king-ark',
+        tile.x,
+        tile.y,
+      );
+      const oreQty = 2 + Math.floor(oreRoll * 8); // 2~9
+      this.inventory.add('ark', oreQty);
+      notes.push(`아크광석+${oreQty}`);
     }
 
     if (notes.length > 0) {

@@ -16,14 +16,24 @@ export interface MonsterFrameInfo {
 }
 
 export const MONSTER_DISPLAY_SCALE = 1;
-/** ?袁???깅뮞 ?癒?궚???뚣끇猷??遺얇늺?癒?퐣??????癰궰 ??됱몵嚥?筌띿쉸??(????쎈뱜???袁???깅뮞?? ??쑴???筌ｋ떯而???由?. */
+/** 아틀라스 원본이 커도 화면에서는 이 한 변 안으로 맞춤. */
 export const MONSTER_DISPLAY_MAX_SIDE = 112;
-/** atlas.png/json ?대Ŋ猿????됰슢??怨?夷똚ebView 筌?Ŋ???얜똾??遺우뒠. ?癒??獄쏅떽? ???춳??????? */
-export const MONSTER_ATLAS_CACHE_VERSION = '0.1.20';
+/** 오우거는 다른 몬스터보다 30% 크게 표시합니다. */
+export const OGRE_DISPLAY_SCALE = 1.3;
+const OGRE_TYPE_IDS = new Set<string>([
+  'monster-ogre',
+  'monster-elder-ogre',
+  'monster-twinhead-ogre',
+  'monster-blood-ogre',
+  'monster-thunder-ogre',
+  'monster-ogre-king',
+]);
+/** atlas.png/json 교체 시 브라우저·WebView 캐시 무효화용. */
+export const MONSTER_ATLAS_CACHE_VERSION = '0.1.23';
 
 /**
- * ./monsters/atlas.png + atlas.json ??嚥≪뮆諭??筌뤣딅뮞??SpriteFrame????볥궗??몃빍??
- * ?袁⑥쟿?袁⑥춳??筌?뗀苡??살쨮 ??롮뵬 揶쏆뮆????용뮞筌ｌ꼶? 筌띾슢諭??UV/Y??繹먥뫁彛??獄쎻뫗???몃빍??
+ * ./monsters/atlas.png + atlas.json 을 로드해 몬스터 SpriteFrame을 제공합니다.
+ * 프레임마다 캔버스로 잘라 개별 텍스처를 만들어 UV/Y축 깨짐을 방지합니다.
  */
 export class MonsterAtlas {
   private readonly frames = new Map<string, SpriteFrame>();
@@ -38,13 +48,16 @@ export class MonsterAtlas {
     return this.frames.get(typeId) ?? null;
   }
 
-  /** ?遺얇늺??域밸챶?????由?筌ㅼ뮆? 癰궰 ??쀫립 ?怨몄뒠). */
+  /** 화면에 그리는 크기. 오우거는 max side를 1.3배로 씁니다. */
   getDisplaySize(typeId: string): { width: number; height: number } | null {
     const size = this.sizes.get(typeId);
     if (!size) return null;
     const longest = Math.max(size.width, size.height);
+    const maxSide = OGRE_TYPE_IDS.has(typeId)
+      ? MONSTER_DISPLAY_MAX_SIDE * OGRE_DISPLAY_SCALE
+      : MONSTER_DISPLAY_MAX_SIDE;
     const fit = longest > 0
-      ? Math.min(MONSTER_DISPLAY_SCALE, MONSTER_DISPLAY_MAX_SIDE / longest)
+      ? Math.min(MONSTER_DISPLAY_SCALE, maxSide / longest)
       : MONSTER_DISPLAY_SCALE;
     return {
       width: Math.max(1, Math.round(size.width * fit)),
@@ -100,7 +113,7 @@ function cropFrame(
     throw new Error('Failed to create 2d context for monster frame crop');
   }
   context.imageSmoothingEnabled = false;
-  // atlas.json?? ???筌왖 ?ル슣湲??疫꿸퀣?(PIL)??낅빍??
+  // atlas.json은 이미지 좌상단 기준(PIL)입니다.
   context.drawImage(
     source,
     frame.x,

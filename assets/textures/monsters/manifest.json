@@ -1,23 +1,156 @@
 {
-  "monsters": {
-    "slime": { "typeId": "monster-slime", "atlas": "atlas.png", "frame": "slime" },
-    "wolf": { "typeId": "monster-wolf", "atlas": "atlas.png", "frame": "wolf" },
-    "golem": { "typeId": "monster-golem", "atlas": "atlas.png", "frame": "golem" },
-    "orc": { "typeId": "monster-orc", "atlas": "atlas.png", "frame": "orc" },
-    "orc-warrior": { "typeId": "monster-orc-warrior", "atlas": "atlas.png", "frame": "orc-warrior" },
-    "hero-orc": { "typeId": "monster-hero-orc", "atlas": "atlas.png", "frame": "hero-orc" },
-    "werewolf": { "typeId": "monster-werewolf", "atlas": "atlas.png", "frame": "werewolf" },
-    "red-wolf": { "typeId": "monster-red-wolf", "atlas": "atlas.png", "frame": "red-wolf" },
-    "lycanthrope": { "typeId": "monster-lycanthrope", "atlas": "atlas.png", "frame": "lycanthrope" },
-    "lizardman": { "typeId": "monster-lizardman", "atlas": "atlas.png", "frame": "lizardman" },
-    "black-lizardman": { "typeId": "monster-black-lizardman", "atlas": "atlas.png", "frame": "black-lizardman" },
-    "elder-lizardman": { "typeId": "monster-elder-lizardman", "atlas": "atlas.png", "frame": "elder-lizardman" }
-  },
-  "atlas": {
-    "file": "atlas.png",
-    "json": "atlas.json",
-    "width": 1536,
-    "height": 1024,
-    "source": "pixel_verified_generated_monster_atlas"
-  }
+    "monsters":  {
+                     "slime":  {
+                                   "typeId":  "monster-slime",
+                                   "atlas":  "atlas.png",
+                                   "frame":  "slime"
+                               },
+                     "wolf":  {
+                                  "typeId":  "monster-wolf",
+                                  "atlas":  "atlas.png",
+                                  "frame":  "wolf"
+                              },
+                     "golem":  {
+                                   "typeId":  "monster-golem",
+                                   "atlas":  "atlas.png",
+                                   "frame":  "golem"
+                               },
+                     "orc":  {
+                                 "typeId":  "monster-orc",
+                                 "atlas":  "atlas.png",
+                                 "frame":  "orc"
+                             },
+                     "orc-warrior":  {
+                                         "typeId":  "monster-orc-warrior",
+                                         "atlas":  "atlas.png",
+                                         "frame":  "orc-warrior"
+                                     },
+                     "hero-orc":  {
+                                      "typeId":  "monster-hero-orc",
+                                      "atlas":  "atlas.png",
+                                      "frame":  "hero-orc"
+                                  },
+                     "werewolf":  {
+                                      "typeId":  "monster-werewolf",
+                                      "atlas":  "atlas.png",
+                                      "frame":  "werewolf"
+                                  },
+                     "red-wolf":  {
+                                      "typeId":  "monster-red-wolf",
+                                      "atlas":  "atlas.png",
+                                      "frame":  "red-wolf"
+                                  },
+                     "lycanthrope":  {
+                                         "typeId":  "monster-lycanthrope",
+                                         "atlas":  "atlas.png",
+                                         "frame":  "lycanthrope"
+                                     },
+                     "lizardman":  {
+                                       "typeId":  "monster-lizardman",
+                                       "atlas":  "atlas.png",
+                                       "frame":  "lizardman"
+                                   },
+                     "black-lizardman":  {
+                                             "typeId":  "monster-black-lizardman",
+                                             "atlas":  "atlas.png",
+                                             "frame":  "black-lizardman"
+                                         },
+                     "elder-lizardman":  {
+                                             "typeId":  "monster-elder-lizardman",
+                                             "atlas":  "atlas.png",
+                                             "frame":  "elder-lizardman"
+                                         },
+                     "harpy":  {
+                                   "typeId":  "monster-harpy",
+                                   "atlas":  "atlas.png",
+                                   "frame":  "harpy"
+                               },
+                     "blood-harpy":  {
+                                         "typeId":  "monster-blood-harpy",
+                                         "atlas":  "atlas.png",
+                                         "frame":  "blood-harpy"
+                                     },
+                     "elder-harpy":  {
+                                         "typeId":  "monster-elder-harpy",
+                                         "atlas":  "atlas.png",
+                                         "frame":  "elder-harpy"
+                                     },
+                     "harpy-siren":  {
+                                         "typeId":  "monster-harpy-siren",
+                                         "atlas":  "atlas.png",
+                                         "frame":  "harpy-siren"
+                                     },
+                     "harpy-queen":  {
+                                         "typeId":  "monster-harpy-queen",
+                                         "atlas":  "atlas.png",
+                                         "frame":  "harpy-queen"
+                                     },
+                     "troll":  {
+                                   "typeId":  "monster-troll",
+                                   "atlas":  "atlas.png",
+                                   "frame":  "troll"
+                               },
+                     "elder-troll":  {
+                                         "typeId":  "monster-elder-troll",
+                                         "atlas":  "atlas.png",
+                                         "frame":  "elder-troll"
+                                     },
+                     "high-troll":  {
+                                        "typeId":  "monster-high-troll",
+                                        "atlas":  "atlas.png",
+                                        "frame":  "high-troll"
+                                    },
+                     "twinhead-troll":  {
+                                            "typeId":  "monster-twinhead-troll",
+                                            "atlas":  "atlas.png",
+                                            "frame":  "twinhead-troll"
+                                        },
+                     "blood-troll":  {
+                                         "typeId":  "monster-blood-troll",
+                                         "atlas":  "atlas.png",
+                                         "frame":  "blood-troll"
+                                     },
+                     "troll-king":  {
+                                        "typeId":  "monster-troll-king",
+                                        "atlas":  "atlas.png",
+                                        "frame":  "troll-king"
+                                    },
+                     "ogre":  {
+                                  "typeId":  "monster-ogre",
+                                  "atlas":  "atlas.png",
+                                  "frame":  "ogre"
+                              },
+                     "elder-ogre":  {
+                                        "typeId":  "monster-elder-ogre",
+                                        "atlas":  "atlas.png",
+                                        "frame":  "elder-ogre"
+                                    },
+                     "twinhead-ogre":  {
+                                           "typeId":  "monster-twinhead-ogre",
+                                           "atlas":  "atlas.png",
+                                           "frame":  "twinhead-ogre"
+                                       },
+                     "blood-ogre":  {
+                                        "typeId":  "monster-blood-ogre",
+                                        "atlas":  "atlas.png",
+                                        "frame":  "blood-ogre"
+                                    },
+                     "thunder-ogre":  {
+                                          "typeId":  "monster-thunder-ogre",
+                                          "atlas":  "atlas.png",
+                                          "frame":  "thunder-ogre"
+                                      },
+                     "ogre-king":  {
+                                       "typeId":  "monster-ogre-king",
+                                       "atlas":  "atlas.png",
+                                       "frame":  "ogre-king"
+                                   }
+                 },
+    "atlas":  {
+                  "file":  "atlas.png",
+                  "json":  "atlas.json",
+                  "width":  1536,
+                  "height":  1840,
+                  "source":  "monster_atlas_harpies_trolls_ogres"
+              }
 }

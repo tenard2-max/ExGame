@@ -20,6 +20,24 @@ export type InventoryListener = (model: InventoryModel) => void;
 const DEFAULT_CAPACITY = 40;
 export const LYCANTHROPE_SWORD_DROP_CHANCE = 0.03;
 export const ELDER_LIZARDMAN_SWORD_DROP_CHANCE = 0.03;
+/** 중급 하피 드랍 (중급몬스터 셋팅.xlsx). */
+export const ELDER_HARPY_MITHRIL_DROP_CHANCE = 0.05;
+export const HARPY_SIREN_MITHRIL_DROP_CHANCE = 0.5;
+export const HARPY_QUEEN_ORICHALCUM_DROP_CHANCE = 0.1;
+/** 중급 트롤 드랍 (트롤1/트롤2.xlsx). */
+export const TROLL_MITHRIL_DROP_CHANCE = 0.06;
+export const ELDER_TROLL_MITHRIL_DROP_CHANCE = 0.65;
+export const HIGH_TROLL_ORICHALCUM_DROP_CHANCE = 0.1;
+export const TWINHEAD_TROLL_MITHRIL_DROP_CHANCE = 0.07;
+export const BLOOD_TROLL_MITHRIL_DROP_CHANCE = 0.75;
+export const TROLL_KING_ORICHALCUM_DROP_CHANCE = 0.12;
+/** 중급 오우거 드랍 (오우거1/오우거2.xlsx). */
+export const OGRE_MITHRIL_DROP_CHANCE = 0.08;
+export const ELDER_OGRE_MITHRIL_DROP_CHANCE = 0.77;
+export const TWINHEAD_OGRE_ORICHALCUM_DROP_CHANCE = 0.15;
+export const BLOOD_OGRE_MITHRIL_DROP_CHANCE = 0.09;
+export const THUNDER_OGRE_MITHRIL_DROP_CHANCE = 0.78;
+export const OGRE_KING_ORICHALCUM_DROP_CHANCE = 0.19;
 export const STARTER_GEAR_QUANTITY = 10;
 
 /**

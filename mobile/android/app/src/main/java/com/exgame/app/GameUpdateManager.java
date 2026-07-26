@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.util.Log;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedInputStream;
@@ -53,6 +54,38 @@ public final class GameUpdateManager {
             this.updated = updated;
             this.version = version;
             this.versionCode = versionCode;
+            this.message = message;
+        }
+    }
+
+    /** APK 업데이트 확인 결과 (GitHub Releases latest). */
+    public static final class ApkCheckResult {
+        public final boolean newerAvailable;
+        public final boolean checkFailed;
+        public final String localVersion;
+        public final int localCode;
+        public final String remoteVersion;
+        public final String apkDownloadUrl;
+        public final String releasePageUrl;
+        public final String message;
+
+        ApkCheckResult(
+                boolean newerAvailable,
+                boolean checkFailed,
+                String localVersion,
+                int localCode,
+                String remoteVersion,
+                String apkDownloadUrl,
+                String releasePageUrl,
+                String message
+        ) {
+            this.newerAvailable = newerAvailable;
+            this.checkFailed = checkFailed;
+            this.localVersion = localVersion;
+            this.localCode = localCode;
+            this.remoteVersion = remoteVersion;
+            this.apkDownloadUrl = apkDownloadUrl;
+            this.releasePageUrl = releasePageUrl;
             this.message = message;
         }
     }
@@ -116,6 +149,90 @@ public final class GameUpdateManager {
 
     public int getInstalledWwwVersionCode() {
         return prefs().getInt(KEY_WWW_VERSION_CODE, bundledVersionCode());
+    }
+
+    public String getReleasesLatestUrl() {
+        return String.format(Locale.US, "https://github.com/%s/%s/releases/latest", owner, repo);
+    }
+
+    /**
+     * GitHub Releases latest 의 APK 에셋을 확인하고 설치본과 비교합니다.
+     * PAT 없이 공개 API만 사용합니다.
+     */
+    public ApkCheckResult checkApkUpdate() {
+        String localVer = bundledVersionName();
+        int localCode = bundledVersionCode();
+        String releasePage = getReleasesLatestUrl();
+        try {
+            String apiUrl = String.format(
+                    Locale.US,
+                    "https://api.github.com/repos/%s/%s/releases/latest",
+                    owner, repo
+            );
+            byte[] raw = downloadBytes(apiUrl, null);
+            String body = new String(raw, StandardCharsets.UTF_8).trim();
+            if (body.isEmpty()) {
+                return new ApkCheckResult(
+                        false, true, localVer, localCode, "", null, releasePage,
+                        "릴리스 정보를 비었습니다"
+                );
+            }
+            JSONObject release = new JSONObject(body);
+            String tag = release.optString("tag_name", "");
+            String remoteVer = tag.startsWith("v") || tag.startsWith("V")
+                    ? tag.substring(1)
+                    : tag;
+            if (remoteVer.isEmpty()) {
+                remoteVer = release.optString("name", "");
+            }
+            String apkUrl = pickApkAssetUrl(release.optJSONArray("assets"));
+            if (apkUrl == null || apkUrl.isEmpty()) {
+                // 파일명 규칙 폴백
+                if (!remoteVer.isEmpty()) {
+                    apkUrl = String.format(
+                            Locale.US,
+                            "https://github.com/%s/%s/releases/latest/download/exgame-%s-android-debug.apk",
+                            owner, repo, remoteVer
+                    );
+                }
+            }
+            boolean newer = !remoteVer.isEmpty()
+                    && compareSemver(remoteVer, localVer) > 0;
+            if (!newer) {
+                return new ApkCheckResult(
+                        false, false, localVer, localCode, remoteVer, apkUrl, releasePage,
+                        "이미 최신입니다"
+                );
+            }
+            return new ApkCheckResult(
+                    true, false, localVer, localCode, remoteVer, apkUrl, releasePage,
+                    "새 APK 있음"
+            );
+        } catch (Exception e) {
+            Log.w(TAG, "checkApkUpdate", e);
+            return new ApkCheckResult(
+                    false, true, localVer, localCode, "", null, releasePage,
+                    e.getMessage() != null ? e.getMessage() : "확인 실패"
+            );
+        }
+    }
+
+    private static String pickApkAssetUrl(JSONArray assets) {
+        if (assets == null || assets.length() == 0) return null;
+        String fallback = null;
+        for (int i = 0; i < assets.length(); i++) {
+            JSONObject asset = assets.optJSONObject(i);
+            if (asset == null) continue;
+            String name = asset.optString("name", "").toLowerCase(Locale.US);
+            if (!name.endsWith(".apk")) continue;
+            String url = asset.optString("browser_download_url", "");
+            if (url.isEmpty()) continue;
+            if (name.contains("android")) {
+                return url;
+            }
+            if (fallback == null) fallback = url;
+        }
+        return fallback;
     }
 
     /**
@@ -321,7 +438,7 @@ public final class GameUpdateManager {
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
         conn.setReadTimeout(READ_TIMEOUT_MS);
-        conn.setRequestProperty("Accept", "application/octet-stream, application/json, */*");
+        conn.setRequestProperty("Accept", "application/vnd.github+json, application/json, application/octet-stream, */*");
         // GitHub 공개 API/다운로드 — PAT 없음. User-Agent 만 명시.
         conn.setRequestProperty("User-Agent", "ExGame-Android-Updater");
         return conn;

@@ -16,14 +16,14 @@ export interface MonsterFrameInfo {
 }
 
 export const MONSTER_DISPLAY_SCALE = 1;
-/** 아틀라스 원본이 커도 화면에서는 이 한 변 안으로 맞춤 (구 스트립 아틀라스와 비슷한 체감 크기). */
+/** ?꾪??쇱뒪 ?먮낯??而ㅻ룄 ?붾㈃?먯꽌??????蹂 ?덉쑝濡?留욎땄 (援??ㅽ듃由??꾪??쇱뒪? 鍮꾩듂??泥닿컧 ?ш린). */
 export const MONSTER_DISPLAY_MAX_SIDE = 112;
-/** atlas.png/json 교체 시 브라우저·WebView 캐시 무효화용. 에셋 바꿀 때마다 올린다. */
-export const MONSTER_ATLAS_CACHE_VERSION = '0.1.18';
+/** atlas.png/json 援먯껜 ??釉뚮씪?곗?쨌WebView 罹먯떆 臾댄슚?붿슜. ?먯뀑 諛붽? ?뚮쭏???щ┛?? */
+export const MONSTER_ATLAS_CACHE_VERSION = '0.1.19';
 
 /**
- * ./monsters/atlas.png + atlas.json 을 로드해 몬스터 SpriteFrame을 제공합니다.
- * 프레임마다 캔버스로 잘라 개별 텍스처를 만들어 UV/Y축 깨짐을 방지합니다.
+ * ./monsters/atlas.png + atlas.json ??濡쒕뱶??紐ъ뒪??SpriteFrame???쒓났?⑸땲??
+ * ?꾨젅?꾨쭏??罹붾쾭?ㅻ줈 ?섎씪 媛쒕퀎 ?띿뒪泥섎? 留뚮뱾??UV/Y異?源⑥쭚??諛⑹??⑸땲??
  */
 export class MonsterAtlas {
   private readonly frames = new Map<string, SpriteFrame>();
@@ -38,7 +38,7 @@ export class MonsterAtlas {
     return this.frames.get(typeId) ?? null;
   }
 
-  /** 화면에 그리는 크기(최대 변 제한 적용). */
+  /** ?붾㈃??洹몃━???ш린(理쒕? 蹂 ?쒗븳 ?곸슜). */
   getDisplaySize(typeId: string): { width: number; height: number } | null {
     const size = this.sizes.get(typeId);
     if (!size) return null;
@@ -100,7 +100,7 @@ function cropFrame(
     throw new Error('Failed to create 2d context for monster frame crop');
   }
   context.imageSmoothingEnabled = false;
-  // atlas.json은 이미지 좌상단 기준(PIL)입니다.
+  // atlas.json? ?대?吏 醫뚯긽??湲곗?(PIL)?낅땲??
   context.drawImage(
     source,
     frame.x,

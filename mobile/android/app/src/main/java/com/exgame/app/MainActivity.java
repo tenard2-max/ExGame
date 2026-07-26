@@ -94,6 +94,10 @@ public class MainActivity extends AppCompatActivity {
         updater.wipeOtaOnce("wipe_ota_v015");
 
         configureWebView();
+        webView.addJavascriptInterface(
+                new ExGameJsBridge(this, updater, updateWorker),
+                "ExGameNative"
+        );
         installAssetLoader(LOAD_OTA_WWW && updater.hasOtaWww());
         startGameNow();
         startBackgroundUpdate();
@@ -263,6 +267,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startBackgroundUpdate() {
+        // www OTA 로드가 꺼져 있으면 백그라운드 다운로드도 생략합니다.
+        if (!LOAD_OTA_WWW) return;
         updateWorker.execute(() -> {
             try {
                 GameUpdateManager.Result result = updater.checkAndApply(

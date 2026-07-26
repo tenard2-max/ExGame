@@ -48,6 +48,8 @@ const LIST_TOP = PANEL_HEIGHT / 2 - TITLE_RESERVE;
 const LIST_BOTTOM = -PANEL_HEIGHT / 2 + HINT_RESERVE;
 const LIST_VIEW_HEIGHT = LIST_TOP - LIST_BOTTOM;
 const SCROLL_STEP = ROW_STRIDE;
+/** 이 거리(디자인 px) 이상 움직이면 탭이 아니라 스크롤로 봅니다. */
+const TOUCH_DRAG_THRESHOLD = 14;
 const TOTAL_LOAD_ROWS = FIXED_SAVE_SLOT_COUNT + 1; // 슬롯 + 원본세이브파일로드
 const TOTAL_SAVE_ROWS = FIXED_SAVE_SLOT_COUNT;
 
@@ -64,7 +66,7 @@ interface LoadRowView {
 
 /**
  * 불러오기/저장 슬롯 목록 UI입니다.
- * 세이브 1~30(+불러오기 시 원본파일), 마우스 휠/방향키로 스크롤합니다.
+ * 세이브 1~30(+불러오기 시 원본파일), 터치 드래그/마우스 휠/방향키로 스크롤합니다.
  */
 @ccclass('LoadMenuHud')
 export class LoadMenuHud extends Component {
@@ -87,6 +89,11 @@ export class LoadMenuHud extends Component {
   private mode: MenuMode = 'load';
   private scrollOffset = 0;
   private contentHeight = 0;
+  private touchScrolling = false;
+  private touchDragged = false;
+  private touchStartDesignY = 0;
+  private touchStartScroll = 0;
+  private activeTouchId: number | null = null;
 
   configure(
     saveSession: SaveSessionController,
@@ -108,7 +115,10 @@ export class LoadMenuHud extends Component {
     window.addEventListener('keydown', this.onDomKeyDown, true);
     input.on(Input.EventType.KEY_DOWN, this.onKeyDown, this);
     input.on(Input.EventType.MOUSE_UP, this.onMouseUp, this);
+    input.on(Input.EventType.TOUCH_START, this.onTouchStart, this);
+    input.on(Input.EventType.TOUCH_MOVE, this.onTouchMove, this);
     input.on(Input.EventType.TOUCH_END, this.onTouchEnd, this);
+    input.on(Input.EventType.TOUCH_CANCEL, this.onTouchCancel, this);
     input.on(Input.EventType.MOUSE_WHEEL, this.onMouseWheel, this);
   }
 
@@ -116,8 +126,12 @@ export class LoadMenuHud extends Component {
     window.removeEventListener('keydown', this.onDomKeyDown, true);
     input.off(Input.EventType.KEY_DOWN, this.onKeyDown, this);
     input.off(Input.EventType.MOUSE_UP, this.onMouseUp, this);
+    input.off(Input.EventType.TOUCH_START, this.onTouchStart, this);
+    input.off(Input.EventType.TOUCH_MOVE, this.onTouchMove, this);
     input.off(Input.EventType.TOUCH_END, this.onTouchEnd, this);
+    input.off(Input.EventType.TOUCH_CANCEL, this.onTouchCancel, this);
     input.off(Input.EventType.MOUSE_WHEEL, this.onMouseWheel, this);
+    this.resetTouchScroll();
     setLoadMenuOpen(false);
   }
 
@@ -156,10 +170,62 @@ export class LoadMenuHud extends Component {
     this.handlePointer(this.pointerLocation);
   }
 
+  private onTouchStart(event: EventTouch): void {
+    if (!this.isOpen || this.activeTouchId !== null) return;
+    const touchId = event.getID();
+    if (touchId === null) return;
+    event.getUILocation(this.pointerLocation);
+    const design = normalizeUiToDesign(
+      this.pointerLocation.x,
+      this.pointerLocation.y,
+    );
+    if (!this.isOverListArea(design.x, design.y)) return;
+    this.activeTouchId = touchId;
+    this.touchScrolling = true;
+    this.touchDragged = false;
+    this.touchStartDesignY = design.y;
+    this.touchStartScroll = this.scrollOffset;
+  }
+
+  private onTouchMove(event: EventTouch): void {
+    if (!this.isOpen || !this.touchScrolling) return;
+    if (event.getID() !== this.activeTouchId) return;
+    event.getUILocation(this.pointerLocation);
+    const design = normalizeUiToDesign(
+      this.pointerLocation.x,
+      this.pointerLocation.y,
+    );
+    const deltaY = design.y - this.touchStartDesignY;
+    if (Math.abs(deltaY) >= TOUCH_DRAG_THRESHOLD) {
+      this.touchDragged = true;
+    }
+    // 손가락을 위로 올리면 아래 슬롯이 보이도록 스크롤을 증가시킵니다.
+    this.setScrollOffset(this.touchStartScroll - deltaY);
+  }
+
   private onTouchEnd(event: EventTouch): void {
     if (!this.isOpen) return;
+    if (this.activeTouchId !== null && event.getID() !== this.activeTouchId) {
+      return;
+    }
+    const wasDrag = this.touchDragged;
+    this.resetTouchScroll();
+    if (wasDrag) return;
     event.getUILocation(this.pointerLocation);
     this.handlePointer(this.pointerLocation);
+  }
+
+  private onTouchCancel(event: EventTouch): void {
+    if (this.activeTouchId !== null && event.getID() !== this.activeTouchId) {
+      return;
+    }
+    this.resetTouchScroll();
+  }
+
+  private resetTouchScroll(): void {
+    this.touchScrolling = false;
+    this.touchDragged = false;
+    this.activeTouchId = null;
   }
 
   private onMouseWheel(event: EventMouse): void {
@@ -196,10 +262,12 @@ export class LoadMenuHud extends Component {
     this.isOpen = open;
     setLoadMenuOpen(open);
     if (this.panelRoot) this.panelRoot.active = open;
-    if (open) {
-      this.scrollOffset = 0;
-      void this.refreshRows();
+    if (!open) {
+      this.resetTouchScroll();
+      return;
     }
+    this.scrollOffset = 0;
+    void this.refreshRows();
   }
 
   private visibleRowCount(): number {
@@ -218,8 +286,8 @@ export class LoadMenuHud extends Component {
     }
     if (this.hintLabel) {
       this.hintLabel.string = this.mode === 'save'
-        ? '슬롯 선택 시 저장 · 기존 세이브는 덮어쓰기 확인 · ESC 닫기'
-        : '휠·↑↓ 스크롤 · ESC 닫기 · 빈 슬롯=현재 진행 저장';
+        ? '슬롯 선택 시 저장 · 드래그로 스크롤 · ESC 닫기'
+        : '드래그·휠 스크롤 · ESC 닫기 · 빈 슬롯=현재 진행 저장';
     }
 
     for (let index = 0; index < this.rows.length; index += 1) {

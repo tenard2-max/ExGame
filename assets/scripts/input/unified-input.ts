@@ -10,6 +10,8 @@ import {
   Vec2,
 } from 'cc';
 
+import { isModalMenuBlockingPointer } from '../ui/hud-layout';
+
 const { ccclass } = _decorator;
 
 const POINTER_DEAD_ZONE = 8;
@@ -138,6 +140,7 @@ export class UnifiedInput extends Component {
 
   private onMouseDown(event: EventMouse): void {
     if (event.getButton() !== EventMouse.BUTTON_LEFT) return;
+    if (isModalMenuBlockingPointer()) return;
     this.isMouseDragging = true;
     event.getUILocation(this.pointerStart);
     event.getLocation(this.pointerStartScreen);
@@ -167,6 +170,7 @@ export class UnifiedInput extends Component {
 
   private onTouchStart(event: EventTouch): void {
     if (this.activeTouchId !== null) return;
+    if (isModalMenuBlockingPointer()) return;
     const touchId = event.getID();
     if (touchId === null) return;
 
@@ -226,6 +230,10 @@ export class UnifiedInput extends Component {
   }
 
   private readPointerDirection(out: Vec2): void {
+    if (isModalMenuBlockingPointer()) {
+      out.set(0, 0);
+      return;
+    }
     if (!this.isMouseDragging && this.activeTouchId === null) {
       out.set(0, 0);
       return;

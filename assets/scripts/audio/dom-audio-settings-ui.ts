@@ -1,11 +1,16 @@
 import type { BgmPlaylistPlayer } from './bgm-playlist-player';
 import type { BgmPlaylistSnapshot } from './bgm-types';
 import type { SfxPlayer } from './sfx-player';
+import {
+  hasAndroidNativeBridge,
+  requestAndroidApkUpdate,
+} from '../platform/android-native-bridge';
 import { isMobileShell } from '../ui/mobile-shell';
 
 const STACK_ID = 'exgame-settings-stack';
 const SETTINGS_BTN_ID = 'exgame-settings-gear';
 const AUDIO_BTN_ID = 'exgame-audio-gear';
+const UPDATE_BTN_ID = 'exgame-apk-update-btn';
 const OVERLAY_ID = 'exgame-audio-settings-overlay';
 
 /**
@@ -15,6 +20,7 @@ const OVERLAY_ID = 'exgame-audio-settings-overlay';
 export class DomAudioSettingsUi {
   private settingsButton: HTMLButtonElement | null = null;
   private audioButton: HTMLButtonElement | null = null;
+  private updateButton: HTMLButtonElement | null = null;
   private overlay: HTMLDivElement | null = null;
   private bgm: BgmPlaylistPlayer | null = null;
   private sfx: SfxPlayer | null = null;
@@ -82,11 +88,13 @@ export class DomAudioSettingsUi {
     document.getElementById(STACK_ID)?.remove();
     document.getElementById(SETTINGS_BTN_ID)?.remove();
     document.getElementById(AUDIO_BTN_ID)?.remove();
+    document.getElementById(UPDATE_BTN_ID)?.remove();
     document.getElementById(OVERLAY_ID)?.remove();
     document.getElementById('exgame-bgm-add-bar')?.remove();
     document.getElementById('exgame-bgm-url-modal')?.remove();
     this.settingsButton = null;
     this.audioButton = null;
+    this.updateButton = null;
     this.bgm = null;
     this.sfx = null;
     this.onGameSettingsToggle = null;
@@ -142,8 +150,36 @@ export class DomAudioSettingsUi {
     });
 
     stack.appendChild(audioBtn);
-    document.body.appendChild(stack);
     this.audioButton = audioBtn;
+
+    // Android WebView 전용: GitHub 최신 APK 확인/다운로드
+    if (isMobileShell() && hasAndroidNativeBridge()) {
+      const updateBtn = document.createElement('button');
+      updateBtn.id = UPDATE_BTN_ID;
+      updateBtn.type = 'button';
+      updateBtn.className = 'exgame-dom-gear exgame-dom-update-btn';
+      updateBtn.textContent = '업데이트';
+      updateBtn.title = 'GitHub에서 최신 APK 확인';
+      updateBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.sfx?.unlock();
+        updateBtn.disabled = true;
+        updateBtn.textContent = '확인 중…';
+        requestAndroidApkUpdate();
+        window.setTimeout(() => {
+          if (!this.updateButton) return;
+          this.updateButton.disabled = false;
+          this.updateButton.textContent = '업데이트';
+        }, 2500);
+      });
+      stack.appendChild(updateBtn);
+      this.updateButton = updateBtn;
+    } else {
+      this.updateButton = null;
+    }
+
+    document.body.appendChild(stack);
   }
 
   private showOverlay(): void {
@@ -387,6 +423,14 @@ body.exgame-mobile .exgame-dom-audio-btn {
 }
 .exgame-dom-gear.is-open { border-color: #7ec8ff; background: #243448; }
 .exgame-dom-audio-btn.is-open { border-color: #ffc43c; }
+.exgame-dom-update-btn {
+  border-color: #7dcea0;
+  color: #d5f5e3;
+}
+.exgame-dom-update-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
 .exgame-audio-overlay {
   position: fixed !important;
   inset: 0 !important;

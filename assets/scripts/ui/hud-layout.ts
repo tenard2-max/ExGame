@@ -168,6 +168,18 @@ export function isLoadMenuOpen(): boolean {
   return loadMenuOpen;
 }
 
+/** 모달 UI가 열려 포인터 이동/탭을 월드에 넘기면 안 될 때. */
+export function isModalMenuBlockingPointer(): boolean {
+  return settingsPanelOpen
+    || potionMenuOpen
+    || inventoryMenuOpen
+    || loadMenuOpen
+    || teleporterMenuOpen
+    || blacksmithMenuOpen
+    || merchantMenuOpen
+    || bankerMenuOpen;
+}
+
 export function setTeleporterMenuOpen(isOpen: boolean): void {
   teleporterMenuOpen = isOpen;
 }
@@ -308,13 +320,9 @@ function isOverInventoryMenu(uiX: number, uiY: number): boolean {
 }
 
 function isOverLoadMenu(uiX: number, uiY: number): boolean {
+  // 열려 있으면 화면 전체에서 월드 탭을 막아 스크롤·탭이 월드로 새지 않게 합니다.
   if (!loadMenuOpen) return false;
-  const panelCenterUiX = DESIGN_WIDTH / 2;
-  const panelCenterUiY = DESIGN_HEIGHT / 2 - 40;
-  const halfW = 340;
-  const halfH = 320;
-  return Math.abs(uiX - panelCenterUiX) <= halfW
-    && Math.abs(uiY - panelCenterUiY) <= halfH;
+  return uiX >= 0 && uiX <= DESIGN_WIDTH && uiY >= 0 && uiY <= DESIGN_HEIGHT;
 }
 
 function isOverTeleporterMenu(uiX: number, uiY: number): boolean {

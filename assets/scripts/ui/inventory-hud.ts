@@ -69,6 +69,7 @@ const LIST_BOTTOM = -PANEL_HEIGHT / 2 + HINT_RESERVE;
 const LIST_VIEW_HEIGHT = LIST_TOP - LIST_BOTTOM;
 const LIST_PAD_X = 20;
 const SCROLL_STEP = 48;
+const TOUCH_DRAG_THRESHOLD = 10;
 /** 장착 행 배경·테두리 (눈에 띄는 호박색 톤). */
 const EQUIPPED_ROW_FILL = new Color(88, 58, 28, 240);
 const EQUIPPED_ROW_STROKE = new Color(255, 196, 72, 255);
@@ -128,6 +129,11 @@ export class InventoryHud extends Component {
   private lastPointerHandledAtMs = 0;
   private suppressListenerRefresh = false;
   private readonly hoverLocation = new Vec2();
+  private activeTouchId: number | null = null;
+  private touchScrolling = false;
+  private touchDragged = false;
+  private touchStartDesignY = 0;
+  private touchStartScroll = 0;
 
   configure(
     inventory: InventoryModel,
@@ -158,6 +164,10 @@ export class InventoryHud extends Component {
     input.on(Input.EventType.MOUSE_UP, this.onMouseUp, this);
     input.on(Input.EventType.MOUSE_MOVE, this.onMouseMove, this);
     input.on(Input.EventType.MOUSE_WHEEL, this.onMouseWheel, this);
+    input.on(Input.EventType.TOUCH_START, this.onTouchStart, this);
+    input.on(Input.EventType.TOUCH_MOVE, this.onTouchMove, this);
+    input.on(Input.EventType.TOUCH_END, this.onTouchEnd, this);
+    input.on(Input.EventType.TOUCH_CANCEL, this.onTouchCancel, this);
     window.addEventListener('keydown', this.onDomKeyDown, true);
   }
 
@@ -166,7 +176,12 @@ export class InventoryHud extends Component {
     input.off(Input.EventType.MOUSE_UP, this.onMouseUp, this);
     input.off(Input.EventType.MOUSE_MOVE, this.onMouseMove, this);
     input.off(Input.EventType.MOUSE_WHEEL, this.onMouseWheel, this);
+    input.off(Input.EventType.TOUCH_START, this.onTouchStart, this);
+    input.off(Input.EventType.TOUCH_MOVE, this.onTouchMove, this);
+    input.off(Input.EventType.TOUCH_END, this.onTouchEnd, this);
+    input.off(Input.EventType.TOUCH_CANCEL, this.onTouchCancel, this);
     window.removeEventListener('keydown', this.onDomKeyDown, true);
+    this.resetTouchScroll();
     this.tooltip?.hide();
     setInventoryMenuOpen(false);
   }
@@ -189,8 +204,18 @@ export class InventoryHud extends Component {
     }
     if (event.keyCode === KeyCode.ARROW_UP) {
       this.setScrollOffset(this.scrollOffset - SCROLL_STEP);
-    } else if (event.keyCode === KeyCode.ARROW_DOWN) {
+      return;
+    }
+    if (event.keyCode === KeyCode.ARROW_DOWN) {
       this.setScrollOffset(this.scrollOffset + SCROLL_STEP);
+      return;
+    }
+    if (event.keyCode === KeyCode.PAGE_UP) {
+      this.setScrollOffset(this.scrollOffset - LIST_VIEW_HEIGHT);
+      return;
+    }
+    if (event.keyCode === KeyCode.PAGE_DOWN) {
+      this.setScrollOffset(this.scrollOffset + LIST_VIEW_HEIGHT);
     }
   }
 
@@ -211,15 +236,75 @@ export class InventoryHud extends Component {
 
   private onMouseWheel(event: EventMouse): void {
     if (!this.isOpen) return;
-    const design = normalizeUiToDesign(
-      event.getUILocation().x,
-      event.getUILocation().y,
-    );
-    if (!this.isDesignInsidePanel(design.x, design.y)) return;
+    // 휠 이벤트의 getUILocation 이 (0,0)인 경우가 있어, 창이 열려 있으면
+    // 패널 히트 없이도 스크롤합니다. (월드 줌은 모달 오픈 시 차단됨)
+    const ui = event.getUILocation();
+    if (ui.x !== 0 || ui.y !== 0) {
+      const design = normalizeUiToDesign(ui.x, ui.y);
+      if (!this.isDesignInsidePanel(design.x, design.y)) return;
+    }
     const scrollY = event.getScrollY();
+    if (scrollY === 0) return;
     this.setScrollOffset(
       this.scrollOffset + (scrollY > 0 ? -SCROLL_STEP : SCROLL_STEP),
     );
+  }
+
+  private onTouchStart(event: EventTouch): void {
+    if (!this.isOpen || this.activeTouchId !== null) return;
+    const touchId = event.getID();
+    if (touchId === null) return;
+    event.getUILocation(this.pointerLocation);
+    const design = normalizeUiToDesign(
+      this.pointerLocation.x,
+      this.pointerLocation.y,
+    );
+    if (!this.isDesignInsideList(design.x, design.y)) return;
+    this.activeTouchId = touchId;
+    this.touchScrolling = true;
+    this.touchDragged = false;
+    this.touchStartDesignY = design.y;
+    this.touchStartScroll = this.scrollOffset;
+  }
+
+  private onTouchMove(event: EventTouch): void {
+    if (!this.isOpen || !this.touchScrolling) return;
+    if (event.getID() !== this.activeTouchId) return;
+    event.getUILocation(this.pointerLocation);
+    const design = normalizeUiToDesign(
+      this.pointerLocation.x,
+      this.pointerLocation.y,
+    );
+    const deltaY = design.y - this.touchStartDesignY;
+    if (Math.abs(deltaY) >= TOUCH_DRAG_THRESHOLD) {
+      this.touchDragged = true;
+    }
+    // 손가락을 위로 올리면 아래 항목이 보이도록 스크롤을 증가시킵니다.
+    this.setScrollOffset(this.touchStartScroll - deltaY);
+  }
+
+  private onTouchEnd(event: EventTouch): void {
+    if (!this.isOpen) return;
+    if (this.activeTouchId !== null && event.getID() !== this.activeTouchId) {
+      return;
+    }
+    const wasDrag = this.touchDragged;
+    this.resetTouchScroll();
+    if (wasDrag) return;
+    // 탭(드래그 아님)은 MOUSE_UP 경로에서 이미 처리되므로 여기서는 장착하지 않습니다.
+  }
+
+  private onTouchCancel(event: EventTouch): void {
+    if (this.activeTouchId !== null && event.getID() !== this.activeTouchId) {
+      return;
+    }
+    this.resetTouchScroll();
+  }
+
+  private resetTouchScroll(): void {
+    this.touchScrolling = false;
+    this.touchDragged = false;
+    this.activeTouchId = null;
   }
 
   private toggleMenu(): void {
@@ -669,7 +754,7 @@ export class InventoryHud extends Component {
     }
     const ratio = this.scrollOffset / maxScroll;
     const pct = Math.round(ratio * 100);
-    this.scrollHintLabel.string = `휠/↑↓ 스크롤 · ${pct}%`
+    this.scrollHintLabel.string = `휠/드래그/↑↓ 스크롤 · ${pct}%`
       + (this.scrollOffset <= 0 ? ' (맨 위)' : '')
       + (this.scrollOffset >= maxScroll ? ' (맨 아래)' : '');
   }

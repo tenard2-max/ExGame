@@ -15,6 +15,7 @@ import {
 } from 'cc';
 
 import type { UnifiedInput } from '../input/unified-input';
+import { isModalMenuBlockingPointer } from '../ui/hud-layout';
 
 const { ccclass } = _decorator;
 
@@ -114,6 +115,8 @@ export class WorldPinchZoom extends Component {
   }
 
   private onMouseWheel(event: EventMouse): void {
+    // 아이템/설정/불러오기 등 모달이 열려 있으면 휠은 UI 스크롤 전용입니다.
+    if (isModalMenuBlockingPointer()) return;
     const scrollY = event.getScrollY();
     if (scrollY === 0) return;
     // 위로 스크롤 = 확대

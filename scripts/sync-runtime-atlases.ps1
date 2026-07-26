@@ -54,8 +54,7 @@ Copy-RuntimeAtlas -Label "tile atlas" `
 Copy-RuntimeAtlas -Label "monster atlas" `
     -SourceDir (Join-Path $projectPath "assets\textures\monsters") `
     -DestDir (Join-Path $OutputPath "monsters") `
-    -Files @("atlas.png", "atlas.json") `
-    -GenerateScript (Join-Path $PSScriptRoot "slice-lizardmen.py")
+    -Files @("atlas.png", "atlas.json")
 
 Copy-RuntimeAtlas -Label "player sprite" `
     -SourceDir (Join-Path $projectPath "assets\textures\player") `

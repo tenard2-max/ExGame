@@ -15,7 +15,9 @@ export interface MonsterFrameInfo {
   readonly h: number;
 }
 
-export const MONSTER_DISPLAY_SCALE = 1.2;
+export const MONSTER_DISPLAY_SCALE = 1;
+/** 아틀라스 원본이 커도 화면에서는 이 한 변 안으로 맞춤 (구 스트립 아틀라스와 비슷한 체감 크기). */
+export const MONSTER_DISPLAY_MAX_SIDE = 112;
 
 /**
  * ./monsters/atlas.png + atlas.json 을 로드해 몬스터 SpriteFrame을 제공합니다.
@@ -34,13 +36,17 @@ export class MonsterAtlas {
     return this.frames.get(typeId) ?? null;
   }
 
-  /** 화면에 그리는 크기(스케일 적용). */
+  /** 화면에 그리는 크기(최대 변 제한 적용). */
   getDisplaySize(typeId: string): { width: number; height: number } | null {
     const size = this.sizes.get(typeId);
     if (!size) return null;
+    const longest = Math.max(size.width, size.height);
+    const fit = longest > 0
+      ? Math.min(MONSTER_DISPLAY_SCALE, MONSTER_DISPLAY_MAX_SIDE / longest)
+      : MONSTER_DISPLAY_SCALE;
     return {
-      width: Math.round(size.width * MONSTER_DISPLAY_SCALE),
-      height: Math.round(size.height * MONSTER_DISPLAY_SCALE),
+      width: Math.max(1, Math.round(size.width * fit)),
+      height: Math.max(1, Math.round(size.height * fit)),
     };
   }
 

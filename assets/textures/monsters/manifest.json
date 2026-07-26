@@ -1,76 +1,23 @@
 {
   "monsters": {
-    "slime": {
-      "file": "slime.png",
-      "width": 70,
-      "height": 39,
-      "typeId": "monster-slime"
-    },
-    "wolf": {
-      "file": "wolf.png",
-      "width": 102,
-      "height": 86,
-      "typeId": "monster-wolf"
-    },
-    "golem": {
-      "file": "golem.png",
-      "width": 102,
-      "height": 92,
-      "typeId": "monster-golem"
-    },
-    "orc": {
-      "file": "orc.png",
-      "width": 86,
-      "height": 76,
-      "typeId": "monster-orc"
-    },
-    "orc-warrior": {
-      "file": "orc-warrior.png",
-      "width": 102,
-      "height": 79,
-      "typeId": "monster-orc-warrior"
-    },
-    "hero-orc": {
-      "file": "hero-orc.png",
-      "width": 118,
-      "height": 94,
-      "typeId": "monster-hero-orc"
-    },
-    "werewolf": {
-      "file": "werewolf.png",
-      "width": 102,
-      "height": 102,
-      "typeId": "monster-werewolf"
-    },
-    "red-wolf": {
-      "file": "red-wolf.png",
-      "width": 102,
-      "height": 101,
-      "typeId": "monster-red-wolf"
-    },
-    "lycanthrope": {
-      "file": "lycanthrope.png",
-      "width": 118,
-      "height": 108,
-      "typeId": "monster-lycanthrope"
-    },
-    "lizardman": {
-      "file": "lizardman.png",
-      "width": 102,
-      "height": 85,
-      "typeId": "monster-lizardman"
-    },
-    "black-lizardman": {
-      "file": "black-lizardman.png",
-      "width": 102,
-      "height": 80,
-      "typeId": "monster-black-lizardman"
-    },
-    "elder-lizardman": {
-      "file": "elder-lizardman.png",
-      "width": 118,
-      "height": 103,
-      "typeId": "monster-elder-lizardman"
-    }
+    "slime": { "typeId": "monster-slime", "atlas": "atlas.png", "frame": "slime" },
+    "wolf": { "typeId": "monster-wolf", "atlas": "atlas.png", "frame": "wolf" },
+    "golem": { "typeId": "monster-golem", "atlas": "atlas.png", "frame": "golem" },
+    "orc": { "typeId": "monster-orc", "atlas": "atlas.png", "frame": "orc" },
+    "orc-warrior": { "typeId": "monster-orc-warrior", "atlas": "atlas.png", "frame": "orc-warrior" },
+    "hero-orc": { "typeId": "monster-hero-orc", "atlas": "atlas.png", "frame": "hero-orc" },
+    "werewolf": { "typeId": "monster-werewolf", "atlas": "atlas.png", "frame": "werewolf" },
+    "red-wolf": { "typeId": "monster-red-wolf", "atlas": "atlas.png", "frame": "red-wolf" },
+    "lycanthrope": { "typeId": "monster-lycanthrope", "atlas": "atlas.png", "frame": "lycanthrope" },
+    "lizardman": { "typeId": "monster-lizardman", "atlas": "atlas.png", "frame": "lizardman" },
+    "black-lizardman": { "typeId": "monster-black-lizardman", "atlas": "atlas.png", "frame": "black-lizardman" },
+    "elder-lizardman": { "typeId": "monster-elder-lizardman", "atlas": "atlas.png", "frame": "elder-lizardman" }
+  },
+  "atlas": {
+    "file": "atlas.png",
+    "json": "atlas.json",
+    "width": 1536,
+    "height": 1024,
+    "source": "pixel_verified_generated_monster_atlas"
   }
 }

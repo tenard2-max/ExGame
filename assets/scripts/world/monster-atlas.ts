@@ -18,6 +18,8 @@ export interface MonsterFrameInfo {
 export const MONSTER_DISPLAY_SCALE = 1;
 /** 아틀라스 원본이 커도 화면에서는 이 한 변 안으로 맞춤 (구 스트립 아틀라스와 비슷한 체감 크기). */
 export const MONSTER_DISPLAY_MAX_SIDE = 112;
+/** atlas.png/json 교체 시 브라우저·WebView 캐시 무효화용. 에셋 바꿀 때마다 올린다. */
+export const MONSTER_ATLAS_CACHE_VERSION = '0.1.18';
 
 /**
  * ./monsters/atlas.png + atlas.json 을 로드해 몬스터 SpriteFrame을 제공합니다.
@@ -51,16 +53,18 @@ export class MonsterAtlas {
   }
 
   async load(baseUrl = './monsters'): Promise<void> {
-    const response = await fetch(`${baseUrl}/atlas.json`);
+    const bust = `v=${MONSTER_ATLAS_CACHE_VERSION}`;
+    const jsonUrl = `${baseUrl}/atlas.json?${bust}`;
+    const response = await fetch(jsonUrl, { cache: 'no-store' });
     if (!response.ok) {
-      throw new Error(`Failed to load monster atlas json: ${baseUrl}/atlas.json`);
+      throw new Error(`Failed to load monster atlas json: ${jsonUrl}`);
     }
     const data = (await response.json()) as {
       width: number;
       height: number;
       frames: MonsterFrameInfo[];
     };
-    const image = await loadHtmlImage(`${baseUrl}/atlas.png`);
+    const image = await loadHtmlImage(`${baseUrl}/atlas.png?${bust}`);
 
     this.frames.clear();
     this.sizes.clear();

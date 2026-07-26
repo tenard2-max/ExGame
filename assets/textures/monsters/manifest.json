@@ -150,7 +150,7 @@
                   "file":  "atlas.png",
                   "json":  "atlas.json",
                   "width":  1536,
-                  "height":  1824,
-                  "source":  "monster_atlas_harpy_bg_cleared_v1"
+                  "height":  1860,
+                  "source":  "monster_atlas_midtier_red_outline_tight_v2"
               }
 }

@@ -18,10 +18,19 @@ export interface MonsterFrameInfo {
 export const MONSTER_DISPLAY_SCALE = 1;
 /** 아틀라스 원본이 커도 화면에서는 이 한 변 안으로 맞춤. */
 export const MONSTER_DISPLAY_MAX_SIDE = 112;
+/** 하피는 다른 몬스터보다 40% 크게 표시합니다. */
+export const HARPY_DISPLAY_SCALE = 1.4;
 /** 트롤은 다른 몬스터보다 50% 크게 표시합니다. */
 export const TROLL_DISPLAY_SCALE = 1.5;
 /** 오우거는 다른 몬스터보다 70% 크게 표시합니다. */
 export const OGRE_DISPLAY_SCALE = 1.7;
+const HARPY_TYPE_IDS = new Set<string>([
+  'monster-harpy',
+  'monster-blood-harpy',
+  'monster-elder-harpy',
+  'monster-harpy-siren',
+  'monster-harpy-queen',
+]);
 const TROLL_TYPE_IDS = new Set<string>([
   'monster-troll',
   'monster-elder-troll',
@@ -39,7 +48,7 @@ const OGRE_TYPE_IDS = new Set<string>([
   'monster-ogre-king',
 ]);
 /** atlas.png/json 교체 시 브라우저·WebView 캐시 무효화용. */
-export const MONSTER_ATLAS_CACHE_VERSION = '0.1.25';
+export const MONSTER_ATLAS_CACHE_VERSION = '0.1.26';
 
 /**
  * ./monsters/atlas.png + atlas.json 을 로드해 몬스터 SpriteFrame을 제공합니다.
@@ -58,13 +67,15 @@ export class MonsterAtlas {
     return this.frames.get(typeId) ?? null;
   }
 
-  /** 화면에 그리는 크기. 트롤 1.5배, 오우거 1.7배. */
+  /** 화면에 그리는 크기. 하피 1.4배, 트롤 1.5배, 오우거 1.7배. */
   getDisplaySize(typeId: string): { width: number; height: number } | null {
     const size = this.sizes.get(typeId);
     if (!size) return null;
     const longest = Math.max(size.width, size.height);
     let scale = 1;
-    if (TROLL_TYPE_IDS.has(typeId)) {
+    if (HARPY_TYPE_IDS.has(typeId)) {
+      scale = HARPY_DISPLAY_SCALE;
+    } else if (TROLL_TYPE_IDS.has(typeId)) {
       scale = TROLL_DISPLAY_SCALE;
     } else if (OGRE_TYPE_IDS.has(typeId)) {
       scale = OGRE_DISPLAY_SCALE;

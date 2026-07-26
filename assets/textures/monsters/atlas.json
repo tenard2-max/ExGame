@@ -1,7 +1,7 @@
 {
   "width": 1536,
-  "height": 1832,
-  "source": "monster_atlas_ogre_bg_cleared_v1",
+  "height": 1824,
+  "source": "monster_atlas_harpy_bg_cleared_v1",
   "frames": [
     {
       "name": "slime",
@@ -104,46 +104,46 @@
       "typeId": "monster-harpy",
       "x": 8,
       "y": 1032,
-      "w": 98,
+      "w": 166,
       "h": 256
     },
     {
       "name": "blood-harpy",
       "typeId": "monster-blood-harpy",
-      "x": 114,
+      "x": 182,
       "y": 1032,
-      "w": 98,
+      "w": 148,
       "h": 256
     },
     {
       "name": "elder-harpy",
       "typeId": "monster-elder-harpy",
-      "x": 220,
+      "x": 338,
       "y": 1032,
-      "w": 98,
+      "w": 145,
       "h": 256
     },
     {
       "name": "harpy-siren",
       "typeId": "monster-harpy-siren",
-      "x": 326,
+      "x": 491,
       "y": 1032,
-      "w": 98,
+      "w": 143,
       "h": 256
     },
     {
       "name": "harpy-queen",
       "typeId": "monster-harpy-queen",
-      "x": 432,
+      "x": 642,
       "y": 1032,
-      "w": 98,
+      "w": 142,
       "h": 256
     },
     {
       "name": "troll",
       "typeId": "monster-troll",
       "x": 8,
-      "y": 1304,
+      "y": 1296,
       "w": 215,
       "h": 256
     },
@@ -151,7 +151,7 @@
       "name": "elder-troll",
       "typeId": "monster-elder-troll",
       "x": 231,
-      "y": 1304,
+      "y": 1296,
       "w": 178,
       "h": 256
     },
@@ -159,7 +159,7 @@
       "name": "high-troll",
       "typeId": "monster-high-troll",
       "x": 417,
-      "y": 1304,
+      "y": 1296,
       "w": 183,
       "h": 256
     },
@@ -167,7 +167,7 @@
       "name": "twinhead-troll",
       "typeId": "monster-twinhead-troll",
       "x": 608,
-      "y": 1304,
+      "y": 1296,
       "w": 229,
       "h": 256
     },
@@ -175,7 +175,7 @@
       "name": "blood-troll",
       "typeId": "monster-blood-troll",
       "x": 845,
-      "y": 1304,
+      "y": 1296,
       "w": 207,
       "h": 256
     },
@@ -183,7 +183,7 @@
       "name": "troll-king",
       "typeId": "monster-troll-king",
       "x": 1060,
-      "y": 1304,
+      "y": 1296,
       "w": 194,
       "h": 256
     },
@@ -191,7 +191,7 @@
       "name": "ogre",
       "typeId": "monster-ogre",
       "x": 8,
-      "y": 1568,
+      "y": 1560,
       "w": 203,
       "h": 256
     },
@@ -199,7 +199,7 @@
       "name": "elder-ogre",
       "typeId": "monster-elder-ogre",
       "x": 219,
-      "y": 1568,
+      "y": 1560,
       "w": 151,
       "h": 256
     },
@@ -207,7 +207,7 @@
       "name": "twinhead-ogre",
       "typeId": "monster-twinhead-ogre",
       "x": 378,
-      "y": 1568,
+      "y": 1560,
       "w": 168,
       "h": 256
     },
@@ -215,7 +215,7 @@
       "name": "blood-ogre",
       "typeId": "monster-blood-ogre",
       "x": 554,
-      "y": 1568,
+      "y": 1560,
       "w": 231,
       "h": 256
     },
@@ -223,7 +223,7 @@
       "name": "thunder-ogre",
       "typeId": "monster-thunder-ogre",
       "x": 793,
-      "y": 1568,
+      "y": 1560,
       "w": 198,
       "h": 256
     },
@@ -231,7 +231,7 @@
       "name": "ogre-king",
       "typeId": "monster-ogre-king",
       "x": 999,
-      "y": 1568,
+      "y": 1560,
       "w": 169,
       "h": 256
     }

@@ -4,7 +4,6 @@ import {
   Color,
   Component,
   EventMouse,
-  EventTouch,
   Graphics,
   Input,
   input,
@@ -42,17 +41,23 @@ import {
   SETTINGS_PANEL_WIDTH,
   SETTINGS_ROW_HEIGHT,
 } from './hud-layout';
+import { isMobileShell } from './mobile-shell';
 
 const { ccclass } = _decorator;
+
+const SCROLLBAR_WIDTH = 16;
+const SCROLLBAR_PAD = 10;
+const MIN_THUMB_HEIGHT = 48;
+/** touch+mouse 중복 클릭 방지 */
+const ADJUST_DEBOUNCE_MS = 120;
 
 interface NodeHitTarget {
   readonly node: Node;
   readonly action: () => void;
-  readonly onPress?: boolean;
 }
 
 /**
- * 좌측 「설정」버튼으로 여는 게임 밸런스 패널입니다.
+ * 좌측 「설정」버튼으로 여는 게임 밸런스 패널 (PC 전용).
  * 오디오는 DomAudioSettingsUi의 「오디오」버튼에서 따로 엽니다.
  */
 @ccclass('SettingsHud')
@@ -65,15 +70,20 @@ export class SettingsHud extends Component {
   private cameraNode: Node | null = null;
   private panelRoot: Node | null = null;
   private listRoot: Node | null = null;
+  private scrollTrack: Node | null = null;
+  private scrollThumb: Node | null = null;
   private valueLabels = new Map<GameBalanceKey, Label>();
   private nodeHits: NodeHitTarget[] = [];
   private isOpen = false;
+  private pcEnabled = false;
   private panelOffsetX = 0;
   private panelOffsetY = 0;
   private topLeftOffsetX = 0;
   private topLeftOffsetY = 0;
   private scrollOffset = 0;
   private pressConsumed = false;
+  private lastAdjustAtMs = 0;
+  private scrollDragging = false;
   private readonly domAudioUi = new DomAudioSettingsUi();
   private readonly onDomKeyDown = (event: KeyboardEvent): void => {
     if (!this.isOpen || !isEscapeKey(event)) return;
@@ -90,12 +100,27 @@ export class SettingsHud extends Component {
     this.balance = balance;
     this.cameraNode = cameraNode;
     this.sfx = sfx;
+    this.pcEnabled = !isMobileShell();
     this.topLeftOffsetX = -DESIGN_WIDTH / 2 + 18;
     this.topLeftOffsetY = DESIGN_HEIGHT / 2 - 18;
+
+    // 모바일: 오디오만. 게임 설정 버튼/패널 없음.
+    this.domAudioUi.mount(
+      bgm,
+      sfx,
+      this.pcEnabled
+        ? (open) => {
+          this.setOpen(open);
+        }
+        : null,
+    );
+
+    if (!this.pcEnabled) {
+      this.setOpen(false);
+      return;
+    }
+
     this.panelRoot = this.buildPanel();
-    this.domAudioUi.mount(bgm, sfx, (open) => {
-      this.setOpen(open);
-    });
     this.setOpen(false);
     balance.addListener(() => this.refreshValues());
   }
@@ -105,10 +130,10 @@ export class SettingsHud extends Component {
   }
 
   protected onEnable(): void {
+    // PC 전용 — mouse만 사용 (touch+mouse 이중 발화로 2씩 증감되던 문제 방지)
     input.on(Input.EventType.MOUSE_UP, this.onMouseUp, this);
     input.on(Input.EventType.MOUSE_DOWN, this.onMouseDown, this);
-    input.on(Input.EventType.TOUCH_END, this.onTouchEnd, this);
-    input.on(Input.EventType.TOUCH_START, this.onTouchStart, this);
+    input.on(Input.EventType.MOUSE_MOVE, this.onMouseMove, this);
     input.on(Input.EventType.MOUSE_WHEEL, this.onMouseWheel, this);
     window.addEventListener('keydown', this.onDomKeyDown, true);
   }
@@ -116,14 +141,13 @@ export class SettingsHud extends Component {
   protected onDisable(): void {
     input.off(Input.EventType.MOUSE_UP, this.onMouseUp, this);
     input.off(Input.EventType.MOUSE_DOWN, this.onMouseDown, this);
-    input.off(Input.EventType.TOUCH_END, this.onTouchEnd, this);
-    input.off(Input.EventType.TOUCH_START, this.onTouchStart, this);
+    input.off(Input.EventType.MOUSE_MOVE, this.onMouseMove, this);
     input.off(Input.EventType.MOUSE_WHEEL, this.onMouseWheel, this);
     window.removeEventListener('keydown', this.onDomKeyDown, true);
   }
 
   protected lateUpdate(): void {
-    if (!this.cameraNode) return;
+    if (!this.cameraNode || !this.pcEnabled) return;
     const camera = this.cameraNode.position;
     this.node.setPosition(
       camera.x + this.topLeftOffsetX,
@@ -136,9 +160,15 @@ export class SettingsHud extends Component {
   }
 
   setOpen(isOpen: boolean): void {
+    if (!this.pcEnabled) {
+      this.isOpen = false;
+      setSettingsPanelOpen(false);
+      return;
+    }
     this.isOpen = isOpen;
     setSettingsPanelOpen(isOpen);
     this.domAudioUi.setGameSettingsOpen(isOpen);
+    this.scrollDragging = false;
 
     if (this.panelRoot) {
       this.panelOffsetX = SETTINGS_PANEL_WIDTH / 2 + 96;
@@ -160,43 +190,40 @@ export class SettingsHud extends Component {
   }
 
   private onMouseDown(event: EventMouse): void {
-    if (event.getButton() !== EventMouse.BUTTON_LEFT) return;
+    if (!this.pcEnabled || event.getButton() !== EventMouse.BUTTON_LEFT) return;
     event.getUILocation(this.pointerLocation);
     event.getLocation(this.pointerScreen);
     this.pressConsumed = false;
     this.sfx?.unlock();
     if (!this.isOpen) return;
+
+    if (this.tryBeginScrollDrag(this.pointerScreen.x, this.pointerScreen.y)) {
+      this.pressConsumed = true;
+      event.propagationStopped = true;
+      return;
+    }
+
     if (this.tryHandlePress(this.pointerScreen.x, this.pointerScreen.y)) {
       this.pressConsumed = true;
       event.propagationStopped = true;
     }
   }
 
-  private onTouchStart(event: EventTouch): void {
-    event.getUILocation(this.pointerLocation);
+  private onMouseMove(event: EventMouse): void {
+    if (!this.pcEnabled || !this.isOpen || !this.scrollDragging) return;
     event.getLocation(this.pointerScreen);
-    this.pressConsumed = false;
-    this.sfx?.unlock();
-    if (!this.isOpen) return;
-    if (this.tryHandlePress(this.pointerScreen.x, this.pointerScreen.y)) {
-      this.pressConsumed = true;
-    }
+    this.updateScrollFromThumbWorldY(this.pointerScreen.x, this.pointerScreen.y);
   }
 
   private onMouseUp(event: EventMouse): void {
-    if (event.getButton() !== EventMouse.BUTTON_LEFT) return;
+    if (!this.pcEnabled || event.getButton() !== EventMouse.BUTTON_LEFT) return;
     event.getUILocation(this.pointerLocation);
     event.getLocation(this.pointerScreen);
-    if (this.pressConsumed) {
+    if (this.scrollDragging) {
+      this.scrollDragging = false;
       this.pressConsumed = false;
       return;
     }
-    this.handlePointerRelease();
-  }
-
-  private onTouchEnd(event: EventTouch): void {
-    event.getUILocation(this.pointerLocation);
-    event.getLocation(this.pointerScreen);
     if (this.pressConsumed) {
       this.pressConsumed = false;
       return;
@@ -205,7 +232,7 @@ export class SettingsHud extends Component {
   }
 
   private onMouseWheel(event: EventMouse): void {
-    if (!this.isOpen) return;
+    if (!this.pcEnabled || !this.isOpen) return;
     event.getLocation(this.pointerScreen);
     if (!this.isScreenInsidePanel(this.pointerScreen.x, this.pointerScreen.y)) {
       return;
@@ -221,7 +248,6 @@ export class SettingsHud extends Component {
 
   private handlePointerRelease(): void {
     if (!this.isOpen) return;
-    // 버튼은 press에서 처리. release는 패널 밖 클릭 시 닫기만.
     if (!this.isScreenInsidePanel(this.pointerScreen.x, this.pointerScreen.y)) {
       this.setOpen(false);
     }
@@ -231,11 +257,13 @@ export class SettingsHud extends Component {
     this.rebuildHitTargets();
     const hit = this.findHitTarget(screenX, screenY);
     if (!hit) return false;
+    const now = performance.now();
+    if (now - this.lastAdjustAtMs < ADJUST_DEBOUNCE_MS) return true;
+    this.lastAdjustAtMs = now;
     hit.action();
     return true;
   }
 
-  /** 렌더와 동일: screen → camera.screenToWorld → 버튼 world AABB. */
   private findHitTarget(screenX: number, screenY: number): NodeHitTarget | null {
     const camera = this.cameraNode?.getComponent(Camera);
     if (!camera) return null;
@@ -251,10 +279,10 @@ export class SettingsHud extends Component {
       if (!transform) continue;
       const rect = transform.getBoundingBoxToWorld();
       const bounds = {
-        minX: rect.xMin - 8,
-        maxX: rect.xMax + 8,
-        minY: rect.yMin - 8,
-        maxY: rect.yMax + 8,
+        minX: rect.xMin - 6,
+        maxX: rect.xMax + 6,
+        minY: rect.yMin - 6,
+        maxY: rect.yMax + 6,
         centerX: (rect.xMin + rect.xMax) / 2,
         centerY: (rect.yMin + rect.yMax) / 2,
       };
@@ -279,6 +307,61 @@ export class SettingsHud extends Component {
       && this.worldHitTmp.x <= rect.xMax
       && this.worldHitTmp.y >= rect.yMin
       && this.worldHitTmp.y <= rect.yMax;
+  }
+
+  private tryBeginScrollDrag(screenX: number, screenY: number): boolean {
+    if (!this.scrollTrack || !this.scrollThumb) return false;
+    const camera = this.cameraNode?.getComponent(Camera);
+    if (!camera) return false;
+    screenToWorldPoint(camera, screenX, screenY, this.worldHitTmp);
+    const wx = this.worldHitTmp.x;
+    const wy = this.worldHitTmp.y;
+
+    const thumbUi = this.scrollThumb.getComponent(UITransform);
+    const trackUi = this.scrollTrack.getComponent(UITransform);
+    if (!thumbUi || !trackUi) return false;
+
+    const thumbRect = thumbUi.getBoundingBoxToWorld();
+    const trackRect = trackUi.getBoundingBoxToWorld();
+    const inThumb = wx >= thumbRect.xMin - 4 && wx <= thumbRect.xMax + 4
+      && wy >= thumbRect.yMin - 4 && wy <= thumbRect.yMax + 4;
+    const inTrack = wx >= trackRect.xMin - 4 && wx <= trackRect.xMax + 4
+      && wy >= trackRect.yMin && wy <= trackRect.yMax;
+
+    if (!inThumb && !inTrack) return false;
+
+    this.scrollDragging = true;
+    if (!inThumb) {
+      // 트랙 클릭: 그 위치로 점프
+      this.updateScrollFromThumbWorldY(screenX, screenY);
+    }
+    return true;
+  }
+
+  private updateScrollFromThumbWorldY(screenX: number, screenY: number): void {
+    const camera = this.cameraNode?.getComponent(Camera);
+    if (!camera || !this.scrollTrack) return;
+    screenToWorldPoint(camera, screenX, screenY, this.worldHitTmp);
+    const trackUi = this.scrollTrack.getComponent(UITransform);
+    if (!trackUi) return;
+    const rect = trackUi.getBoundingBoxToWorld();
+    const trackH = Math.max(1, rect.yMax - rect.yMin);
+    const thumbH = this.getThumbHeight();
+    const travel = Math.max(1, trackH - thumbH);
+    // 엄지 중심이 포인터에 오도록
+    const topCenter = rect.yMax - thumbH / 2;
+    const bottomCenter = rect.yMin + thumbH / 2;
+    const clampedY = Math.min(topCenter, Math.max(bottomCenter, this.worldHitTmp.y));
+    const t = (topCenter - clampedY) / travel;
+    this.scrollOffset = clampScroll(t * maxScroll());
+    this.applyScroll();
+    this.rebuildHitTargets();
+  }
+
+  private getThumbHeight(): number {
+    const contentHeight = GAME_BALANCE_ROWS.length * SETTINGS_ROW_HEIGHT;
+    const ratio = Math.min(1, SETTINGS_LIST_VIEW_HEIGHT / Math.max(1, contentHeight));
+    return Math.max(MIN_THUMB_HEIGHT, SETTINGS_LIST_VIEW_HEIGHT * ratio);
   }
 
   private refreshValues(): void {
@@ -322,7 +405,7 @@ export class SettingsHud extends Component {
     this.addLabel(root, '게임 설정', 0, SETTINGS_PANEL_HEIGHT / 2 - 26, 26);
     this.addLabel(
       root,
-      '몬스터·채집·전투 밸런스를 조절합니다',
+      '몬스터·채집·전투 밸런스 (PC) · 휠/스크롤바',
       0,
       SETTINGS_PANEL_HEIGHT / 2 - 50,
       13,
@@ -337,10 +420,54 @@ export class SettingsHud extends Component {
       this.buildRow(list, row.key, row.label, startY - index * SETTINGS_ROW_HEIGHT);
     });
 
+    this.buildScrollbar(root);
     this.buildActionButton(root, '기본값', -110, -SETTINGS_PANEL_HEIGHT / 2 + 40);
     this.buildActionButton(root, '닫기', 110, -SETTINGS_PANEL_HEIGHT / 2 + 40);
     this.applyScroll();
     return root;
+  }
+
+  private buildScrollbar(parent: Node): void {
+    const listTop = SETTINGS_PANEL_HEIGHT / 2 - 70;
+    const trackX = SETTINGS_PANEL_WIDTH / 2 - SCROLLBAR_PAD - SCROLLBAR_WIDTH / 2;
+    const trackCenterY = listTop - SETTINGS_LIST_VIEW_HEIGHT / 2;
+
+    const track = new Node('ScrollTrack');
+    track.layer = Layers.Enum.UI_2D;
+    parent.addChild(track);
+    track.setPosition(trackX, trackCenterY);
+    track.addComponent(UITransform).setContentSize(
+      SCROLLBAR_WIDTH,
+      SETTINGS_LIST_VIEW_HEIGHT,
+    );
+    const trackGfx = track.addComponent(Graphics);
+    trackGfx.fillColor = new Color(30, 40, 55, 220);
+    trackGfx.roundRect(
+      -SCROLLBAR_WIDTH / 2,
+      -SETTINGS_LIST_VIEW_HEIGHT / 2,
+      SCROLLBAR_WIDTH,
+      SETTINGS_LIST_VIEW_HEIGHT,
+      6,
+    );
+    trackGfx.fill();
+    this.scrollTrack = track;
+
+    const thumb = new Node('ScrollThumb');
+    thumb.layer = Layers.Enum.UI_2D;
+    parent.addChild(thumb);
+    const thumbH = this.getThumbHeight();
+    thumb.addComponent(UITransform).setContentSize(SCROLLBAR_WIDTH - 4, thumbH);
+    const thumbGfx = thumb.addComponent(Graphics);
+    thumbGfx.fillColor = new Color(120, 160, 210, 240);
+    thumbGfx.roundRect(
+      -(SCROLLBAR_WIDTH - 4) / 2,
+      -thumbH / 2,
+      SCROLLBAR_WIDTH - 4,
+      thumbH,
+      5,
+    );
+    thumbGfx.fill();
+    this.scrollThumb = thumb;
   }
 
   private applyScroll(): void {
@@ -356,6 +483,39 @@ export class SettingsHud extends Component {
       const worldY = this.listRoot.position.y + child.position.y;
       child.active = worldY <= viewTop + 8 && worldY >= viewBottom - 8;
     }
+    this.layoutScrollbarThumb();
+  }
+
+  private layoutScrollbarThumb(): void {
+    if (!this.scrollThumb || !this.scrollTrack) return;
+    const listTop = SETTINGS_PANEL_HEIGHT / 2 - 70;
+    const trackX = SETTINGS_PANEL_WIDTH / 2 - SCROLLBAR_PAD - SCROLLBAR_WIDTH / 2;
+    const thumbH = this.getThumbHeight();
+    const ui = this.scrollThumb.getComponent(UITransform);
+    if (ui) ui.setContentSize(SCROLLBAR_WIDTH - 4, thumbH);
+
+    // Graphics는 크기 변경 시 다시 그림
+    const gfx = this.scrollThumb.getComponent(Graphics);
+    if (gfx) {
+      gfx.clear();
+      gfx.fillColor = new Color(120, 160, 210, 240);
+      gfx.roundRect(
+        -(SCROLLBAR_WIDTH - 4) / 2,
+        -thumbH / 2,
+        SCROLLBAR_WIDTH - 4,
+        thumbH,
+        5,
+      );
+      gfx.fill();
+    }
+
+    const max = maxScroll();
+    const travel = Math.max(0, SETTINGS_LIST_VIEW_HEIGHT - thumbH);
+    const t = max <= 0 ? 0 : this.scrollOffset / max;
+    const thumbCenterY = listTop - thumbH / 2 - t * travel;
+    this.scrollThumb.setPosition(trackX, thumbCenterY);
+    this.scrollThumb.active = max > 0;
+    this.scrollTrack.active = max > 0;
   }
 
   private rebuildHitTargets(): void {
@@ -367,7 +527,6 @@ export class SettingsHud extends Component {
       this.nodeHits.push({
         node: reset,
         action: () => this.balance?.resetToDefaults(),
-        onPress: true,
       });
     }
     const close = this.panelRoot.getChildByName('Action_닫기');
@@ -375,7 +534,6 @@ export class SettingsHud extends Component {
       this.nodeHits.push({
         node: close,
         action: () => this.setOpen(false),
-        onPress: true,
       });
     }
 
@@ -391,7 +549,6 @@ export class SettingsHud extends Component {
       this.nodeHits.push({
         node: child,
         action: () => this.balance?.adjust(row.key, isPlus ? 1 : -1),
-        onPress: true,
       });
     }
   }
@@ -493,8 +650,11 @@ export class SettingsHud extends Component {
   }
 }
 
-function clampScroll(offset: number): number {
+function maxScroll(): number {
   const contentHeight = GAME_BALANCE_ROWS.length * SETTINGS_ROW_HEIGHT;
-  const maxScroll = Math.max(0, contentHeight - SETTINGS_LIST_VIEW_HEIGHT + 20);
-  return Math.min(maxScroll, Math.max(0, offset));
+  return Math.max(0, contentHeight - SETTINGS_LIST_VIEW_HEIGHT + 20);
+}
+
+function clampScroll(offset: number): number {
+  return Math.min(maxScroll(), Math.max(0, offset));
 }

@@ -1,6 +1,7 @@
 import type { BgmPlaylistPlayer } from './bgm-playlist-player';
 import type { BgmPlaylistSnapshot } from './bgm-types';
 import type { SfxPlayer } from './sfx-player';
+import { isMobileShell } from '../ui/mobile-shell';
 
 const STACK_ID = 'exgame-settings-stack';
 const SETTINGS_BTN_ID = 'exgame-settings-gear';
@@ -25,7 +26,7 @@ export class DomAudioSettingsUi {
   mount(
     bgm: BgmPlaylistPlayer,
     sfx: SfxPlayer,
-    onGameSettingsToggle: (open: boolean) => void,
+    onGameSettingsToggle: ((open: boolean) => void) | null,
   ): void {
     this.destroy();
     this.bgm = bgm;
@@ -107,18 +108,26 @@ export class DomAudioSettingsUi {
     stack.id = STACK_ID;
     stack.className = 'exgame-settings-stack';
 
-    const settingsBtn = document.createElement('button');
-    settingsBtn.id = SETTINGS_BTN_ID;
-    settingsBtn.type = 'button';
-    settingsBtn.className = 'exgame-dom-gear';
-    settingsBtn.textContent = '설정';
-    settingsBtn.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      this.sfx?.unlock();
-      const next = !this.gameSettingsOpen;
-      this.onGameSettingsToggle?.(next);
-    });
+    // 게임 설정은 PC 전용 (모바일 WebView/터치 셸에서는 숨김)
+    const showGameSettings = !isMobileShell() && !!this.onGameSettingsToggle;
+    if (showGameSettings) {
+      const settingsBtn = document.createElement('button');
+      settingsBtn.id = SETTINGS_BTN_ID;
+      settingsBtn.type = 'button';
+      settingsBtn.className = 'exgame-dom-gear';
+      settingsBtn.textContent = '설정';
+      settingsBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.sfx?.unlock();
+        const next = !this.gameSettingsOpen;
+        this.onGameSettingsToggle?.(next);
+      });
+      stack.appendChild(settingsBtn);
+      this.settingsButton = settingsBtn;
+    } else {
+      this.settingsButton = null;
+    }
 
     const audioBtn = document.createElement('button');
     audioBtn.id = AUDIO_BTN_ID;
@@ -132,10 +141,8 @@ export class DomAudioSettingsUi {
       this.setAudioOpen(!this.audioOpen);
     });
 
-    stack.appendChild(settingsBtn);
     stack.appendChild(audioBtn);
     document.body.appendChild(stack);
-    this.settingsButton = settingsBtn;
     this.audioButton = audioBtn;
   }
 

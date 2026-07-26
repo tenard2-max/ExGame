@@ -3,8 +3,8 @@ import type { ItemId } from '../inventory/item-types';
 
 /**
  * 몬스터 콘텐츠 정의입니다.
- * 체력/데미지/경험치/스폰 비율의 실제 게임 값은
- * `monster-balance-catalog` + 설정 HUD가 우선합니다. 여기 숫자는 폴백입니다.
+ * 체력/스폰의 실제 게임 값은 `monster-balance-catalog` + 설정 HUD가 우선합니다.
+ * 경험치·공격은 체력에서 유도하며, 여기 숫자는 레거시 폴백입니다.
  */
 export interface MonsterDefinition {
   readonly displayName: string;

@@ -1,7 +1,7 @@
 /**
  * 플레이어가 바꿀 수 있는 게임 밸런스입니다.
  * localStorage에 저장되며, 설정 HUD에서 조절합니다.
- * 몬스터 관련 값은 monster-balance-catalog 기준으로 관리합니다.
+ * 몬스터 체력(hits)만 수동 조절하고, 경험치·공격·방어는 체력에서 유도합니다.
  */
 import {
   MONSTER_BALANCE_CATALOG,
@@ -9,6 +9,11 @@ import {
   getMonsterBalanceDef,
   type MonsterTuningValues,
 } from './monster-balance-catalog';
+import {
+  monsterAttackFromHp,
+  monsterDefenseFromHp,
+  monsterExperienceFromHp,
+} from './monster-derived-stats';
 
 export type { MonsterTuningValues };
 
@@ -145,9 +150,8 @@ const MONSTER_FIELD_META: ReadonlyArray<{
   unit: string;
 }> = [
   { field: 'hits', labelSuffix: '체력', unit: '회' },
-  { field: 'damage', labelSuffix: '데미지', unit: '' },
+  // 데미지·경험치는 체력에서 자동 계산 — 설정에서는 체력·스폰만 조절
   { field: 'spawnPercent', labelSuffix: '스폰', unit: '%' },
-  { field: 'experience', labelSuffix: '경험치', unit: '' },
 ];
 
 function monsterRowKey(typeId: string, field: MonsterTuningField): string {
@@ -162,12 +166,7 @@ function parseMonsterRowKey(
   if (parts.length !== 3) return null;
   const typeId = parts[1]!;
   const field = parts[2] as MonsterTuningField;
-  if (
-    field !== 'hits'
-    && field !== 'damage'
-    && field !== 'spawnPercent'
-    && field !== 'experience'
-  ) {
+  if (field !== 'hits' && field !== 'spawnPercent') {
     return null;
   }
   return { typeId, field };
@@ -238,22 +237,18 @@ function ensureMonsterTunings(
         def.defaultHits,
         getMonsterFieldLimit(def.typeId, 'hits'),
       ),
-      damage: clampNumber(
-        incoming.damage,
-        def.defaultDamage,
-        getMonsterFieldLimit(def.typeId, 'damage'),
-      ),
       spawnPercent: clampNumber(
         incoming.spawnPercent,
         def.defaultSpawnPercent,
         getMonsterFieldLimit(def.typeId, 'spawnPercent'),
       ),
-      experience: clampNumber(
-        incoming.experience,
-        def.defaultExperience,
-        getMonsterFieldLimit(def.typeId, 'experience'),
-      ),
+      // 저장 호환용 — 전투 계산은 체력 유도값을 씁니다.
+      damage: 0,
+      experience: 0,
     };
+    const hits = next[def.typeId]!.hits;
+    next[def.typeId]!.damage = monsterAttackFromHp(hits);
+    next[def.typeId]!.experience = monsterExperienceFromHp(hits);
   }
   return next;
 }
@@ -322,15 +317,15 @@ export class GameBalanceSettings {
   }
 
   getMonsterDamage(typeId: string): number {
-    const tuning = this.values.monsters[typeId];
-    if (tuning) return tuning.damage;
-    return getMonsterBalanceDef(typeId)?.defaultDamage ?? 1;
+    return monsterAttackFromHp(this.getMonsterMaxHealth(typeId));
   }
 
   getMonsterExperience(typeId: string): number {
-    const tuning = this.values.monsters[typeId];
-    if (tuning) return tuning.experience;
-    return getMonsterBalanceDef(typeId)?.defaultExperience ?? 1;
+    return monsterExperienceFromHp(this.getMonsterMaxHealth(typeId));
+  }
+
+  getMonsterDefense(typeId: string): number {
+    return monsterDefenseFromHp(this.getMonsterMaxHealth(typeId));
   }
 
   /** 레벨 기반 공격력: base × (1 + pct/100 × (level-1)). */
@@ -463,7 +458,16 @@ export class GameBalanceSettings {
       );
       const rounded = limit.step < 1 ? round2(nextValue) : Math.round(nextValue);
       const monsters = cloneMonsters(this.values.monsters);
-      monsters[typeId] = { ...current, [field]: rounded };
+      if (field === 'hits') {
+        monsters[typeId] = {
+          ...current,
+          hits: rounded,
+          damage: monsterAttackFromHp(rounded),
+          experience: monsterExperienceFromHp(rounded),
+        };
+      } else {
+        monsters[typeId] = { ...current, [field]: rounded };
+      }
       this.values = { ...this.values, monsters };
       this.persist();
       this.notify();

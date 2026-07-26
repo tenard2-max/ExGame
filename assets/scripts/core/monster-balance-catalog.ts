@@ -1,6 +1,13 @@
+import {
+  monsterAttackFromHp,
+  monsterExperienceFromHp,
+} from './monster-derived-stats';
+
 /**
  * 몬스터 밸런스 단일 정의입니다.
- * 새 몬스터를 추가할 때 여기만 등록하면 설정·스폰·체력/데미지/경험치에 반영됩니다.
+ * 새 몬스터를 추가할 때 여기만 등록하면 설정·스폰·체력에 반영됩니다.
+ * 경험치·공격·방어는 체력(hits)에서 유도합니다
+ * (XP=floor(HP/2), ATK=ceil(HP/5), DEF=ceil(HP/10)).
  */
 
 export type MonsterSpawnKind =
@@ -195,11 +202,12 @@ export function getMonsterBalanceDef(
 export function createDefaultMonsterTunings(): Record<string, MonsterTuningValues> {
   const result: Record<string, MonsterTuningValues> = {};
   for (const entry of MONSTER_BALANCE_CATALOG) {
+    const hits = entry.defaultHits;
     result[entry.typeId] = {
-      hits: entry.defaultHits,
-      damage: entry.defaultDamage,
+      hits,
+      damage: monsterAttackFromHp(hits),
       spawnPercent: entry.defaultSpawnPercent,
-      experience: entry.defaultExperience,
+      experience: monsterExperienceFromHp(hits),
     };
   }
   return result;

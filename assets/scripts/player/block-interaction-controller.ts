@@ -14,6 +14,11 @@ import {
 
 import type { GameBalanceSettings } from '../core/game-balance-settings';
 import { formatNumber2 } from '../core/game-balance-settings';
+import {
+  monsterAttackFromHp,
+  monsterDefenseFromHp,
+  monsterExperienceFromHp,
+} from '../core/monster-derived-stats';
 import type { SfxPlayer } from '../audio/sfx-player';
 import {
   DUNGEON_REWARD,
@@ -596,7 +601,11 @@ export class BlockInteractionController extends Component {
     const stats = this.playerStats!;
     const maxHp = this.balance?.getMonsterMaxHealth(monster.typeId)
       ?? definition.maxHealth;
-    const damage = this.getPlayerAttackDamage();
+    const monsterDefense = this.balance?.getMonsterDefense(monster.typeId)
+      ?? monsterDefenseFromHp(maxHp);
+    const rawDamage = this.getPlayerAttackDamage();
+    // 최소 1 — 방어가 높아도 전투가 멈추지 않게 합니다.
+    const damage = Math.max(1, rawDamage - monsterDefense);
     this.sfx?.unlock();
     this.sfx?.play('hit-monster');
     this.playerMotion?.playHitImpulse();
@@ -610,7 +619,7 @@ export class BlockInteractionController extends Component {
       this.showHpBar(tile, remaining, maxHp);
       this.chunkManager!.shakeEntityVisual(monster.id);
       const monsterDamage = this.balance?.getMonsterDamage(monster.typeId)
-        ?? definition.attackDamage;
+        ?? monsterAttackFromHp(maxHp);
       const incoming = Math.max(
         0,
         monsterDamage - (this.inventory?.getEquippedDefense() ?? 0)
@@ -631,7 +640,7 @@ export class BlockInteractionController extends Component {
 
     this.grantMonsterRewards(monster, tile);
     const experience = this.balance?.getMonsterExperience(monster.typeId)
-      ?? definition.experienceReward;
+      ?? monsterExperienceFromHp(maxHp);
     const levelUps = stats.addExperience(experience);
     const bonus = this.consumePendingLootMessage();
     this.showMessage(

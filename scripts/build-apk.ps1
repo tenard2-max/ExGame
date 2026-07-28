@@ -74,19 +74,19 @@ if (-not (Test-Path ".\gradlew.bat") -or -not (Test-Path ".\gradle\wrapper\gradl
     Write-Host "[3/4] Wrapper already present"
 }
 
-Write-Host "[4/4] assembleDebug"
-& .\gradlew.bat assembleDebug --no-daemon
-if ($LASTEXITCODE -ne 0) { throw "assembleDebug failed" }
+Write-Host "[4/4] assembleRelease (upload keystore)"
+& .\gradlew.bat assembleRelease --no-daemon
+if ($LASTEXITCODE -ne 0) { throw "assembleRelease failed" }
 
-$debugApk = Join-Path $androidDir "app\build\outputs\apk\debug\app-debug.apk"
-if (-not (Test-Path -LiteralPath $debugApk)) {
-    throw "APK not found: $debugApk"
+$releaseApk = Join-Path $androidDir "app\build\outputs\apk\release\app-release.apk"
+if (-not (Test-Path -LiteralPath $releaseApk)) {
+    throw "APK not found: $releaseApk"
 }
 
 $outDir = Join-Path $projectPath "release"
 New-Item -ItemType Directory -Path $outDir -Force | Out-Null
-$dest = Join-Path $outDir "exgame-$version-android-debug.apk"
-Copy-Item -LiteralPath $debugApk -Destination $dest -Force
+$dest = Join-Path $outDir "exgame-$version-android.apk"
+Copy-Item -LiteralPath $releaseApk -Destination $dest -Force
 
 Write-Host ""
 Write-Host "APK build done:"

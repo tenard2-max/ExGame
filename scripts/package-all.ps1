@@ -26,7 +26,7 @@ Write-Host "[3/4] Android www 동기화..."
 
 $androidDir = Join-Path $projectPath "mobile\android"
 $gradlew = Join-Path $androidDir "gradlew.bat"
-$releaseApk = Join-Path $androidDir "app\build\outputs\apk\release\app-release-unsigned.apk"
+$releaseApk = Join-Path $androidDir "app\build\outputs\apk\release\app-release.apk"
 $debugApk = Join-Path $androidDir "app\build\outputs\apk\debug\app-debug.apk"
 $outDir = Join-Path $projectPath "release"
 New-Item -ItemType Directory -Path $outDir -Force | Out-Null
@@ -61,8 +61,9 @@ if ($sdkDir) {
 if (Test-Path -LiteralPath $gradlew) {
   Push-Location $androidDir
   try {
-    & .\gradlew.bat assembleDebug
-    if ($LASTEXITCODE -ne 0) { throw "gradlew assembleDebug 실패" }
+    # 고정 업로드 키로 release 서명 APK 생성 (덮어설치 가능)
+    & .\gradlew.bat assembleRelease
+    if ($LASTEXITCODE -ne 0) { throw "gradlew assembleRelease 실패" }
     $apkBuilt = $true
   } finally {
     Pop-Location
@@ -73,15 +74,15 @@ if (Test-Path -LiteralPath $gradlew) {
 }
 
 $copiedApk = $null
-if ($apkBuilt -and (Test-Path -LiteralPath $debugApk)) {
-    $copiedApk = Join-Path $outDir "exgame-$Version-android-debug.apk"
-    Copy-Item -LiteralPath $debugApk -Destination $copiedApk -Force
+if ($apkBuilt -and (Test-Path -LiteralPath $releaseApk)) {
+    $copiedApk = Join-Path $outDir "exgame-$Version-android.apk"
+    Copy-Item -LiteralPath $releaseApk -Destination $copiedApk -Force
+} elseif (Test-Path -LiteralPath $releaseApk) {
+    $copiedApk = Join-Path $outDir "exgame-$Version-android.apk"
+    Copy-Item -LiteralPath $releaseApk -Destination $copiedApk -Force
 } elseif (Test-Path -LiteralPath $debugApk) {
     $copiedApk = Join-Path $outDir "exgame-$Version-android-debug.apk"
     Copy-Item -LiteralPath $debugApk -Destination $copiedApk -Force
-} elseif (Test-Path -LiteralPath $releaseApk) {
-    $copiedApk = Join-Path $outDir "exgame-$Version-android-release-unsigned.apk"
-    Copy-Item -LiteralPath $releaseApk -Destination $copiedApk -Force
 }
 
 Write-Host ""

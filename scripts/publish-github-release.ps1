@@ -123,6 +123,7 @@ if (-not $ghCmd) {
 }
 
 $tag = "v$Version"
+$androidApk = Join-Path $outDir "exgame-$Version-android.apk"
 if (-not $Notes) {
     $Notes = @"
 ## ExGame v$Version
@@ -132,7 +133,10 @@ if (-not $Notes) {
 2. ``auto-run.bat`` 실행 (Python 필요)
 3. ``index.html`` 더블클릭은 지원하지 않습니다 (하얀 화면)
 
-Android APK / www OTA zip은 Releases에 올리지 않습니다.
+### Android
+1. ``exgame-$Version-android.apk`` 설치 (고정 업로드 키 서명)
+2. 예전 debug 서명 앱이 있으면 **삭제 후** 설치
+3. 이후 버전부터는 덮어설치 가능
 "@
 }
 
@@ -157,8 +161,13 @@ $ErrorActionPreference = "Continue"
 & $ghCmd release view $tag --repo "$Owner/$Repo" 2>$null | Out-Null
 $releaseExists = ($LASTEXITCODE -eq 0)
 $ErrorActionPreference = $prevEap
-# GitHub Releases: PC bat 패키지(ZIP)만 등록
+# GitHub Releases: PC ZIP + 서명 APK
 $assets = @($pcZip)
+if (Test-Path -LiteralPath $androidApk) {
+    $assets += $androidApk
+} else {
+    Write-Warning "Android APK missing (skip upload): $androidApk"
+}
 
 $ErrorActionPreference = "Continue"
 try {

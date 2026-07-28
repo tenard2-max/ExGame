@@ -1,6 +1,13 @@
 plugins {
     id "com.android.application"
 }
+
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace "com.exgame.app"
     compileSdk 34
@@ -8,15 +15,34 @@ android {
         applicationId "com.exgame.app"
         minSdk 24
         targetSdk 34
-        versionCode 127
-        versionName "0.1.27"
+        versionCode 128
+        versionName "0.1.28"
+    }
+    signingConfigs {
+        upload {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias keystoreProperties["keyAlias"]
+                keyPassword keystoreProperties["keyPassword"]
+                storeFile rootProject.file(keystoreProperties["storeFile"])
+                storePassword keystoreProperties["storePassword"]
+            }
+        }
     }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.upload
+            }
         }
-        debug { minifyEnabled false }
+        debug {
+            minifyEnabled false
+            // debug/release 모두 동일 키 → GitHub APK 덮어설치 충돌 방지
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.upload
+            }
+        }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

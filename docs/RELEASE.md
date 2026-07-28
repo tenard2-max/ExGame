@@ -21,15 +21,16 @@ GitHub Releases에 올리는 파일:
 | 파일 | 대상 |
 |------|------|
 | `exgame-*.zip` | PC 오프라인 (`auto-run.bat`) |
+| `exgame-*-android.apk` | Android (고정 업로드 키 서명, 덮어설치 가능) |
 
-로컬에만 생성 (Releases 미업로드):
+로컬 메타:
 
 | 파일 | 대상 |
 |------|------|
 | `version.json` | 로컬 메타 |
-| `exgame-*-android-debug.apk` | `package-all.ps1` / `build-apk.ps1` 로 별도 빌드 |
 
-`exgame-*-www.zip` OTA 패키지는 **만들지 않으며** Releases에도 올리지 않습니다. 폰은 APK에 포함된 assets로 실행합니다. → [`MOBILE.md`](./MOBILE.md)
+`exgame-*-www.zip` OTA 패키지는 **만들지 않으며** Releases에도 올리지 않습니다.  
+폰은 Releases의 서명 APK(`exgame-*-android.apk`)로 설치합니다. → [`MOBILE.md`](./MOBILE.md)
 
 ## Releases에 올릴 내용
 
@@ -62,4 +63,5 @@ NovelExplor **게임하기** → `docs/게임하기_소개.html`
 - [ ] 다른 PC에서 ZIP만으로 실행된다 (`auto-run.bat`)
 - [ ] 비행기 모드에서 로드·플레이·저장된다
 - [ ] 버전 문자열이 package.json · ZIP · 태그와 일치한다
-- [ ] Releases에 www.zip / APK가 올라가지 않는다
+- [ ] Releases에 www.zip이 올라가지 않는다
+- [ ] APK가 고정 업로드 키로 서명되어 덮어설치된다

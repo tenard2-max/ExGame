@@ -48,9 +48,17 @@ Android Studio:
 
 산출물을 `release/exgame-<version>-android-debug.apk` 등으로 복사해 GitHub Releases에 PC ZIP과 함께 올립니다.
 
+## 서명 (덮어설치)
+
+GitHub에 올리는 APK는 `mobile/android/keystore/exgame-upload.jks`로 서명합니다.  
+PC가 바뀌어도 같은 키를 쓰므로 **이후 버전은 기존 앱 위에 덮어설치**할 수 있습니다.
+
+- 설정: `mobile/android/keystore.properties`
+- 예전 machine-local debug 서명 APK가 깔려 있으면 **한 번 삭제 후** 새 APK를 설치해야 합니다.
+
 ## 폰 설치
 
-1. Releases에서 APK 다운로드
+1. Releases에서 `exgame-*-android.apk` 다운로드
 2. “알 수 없는 앱 설치” 허용 후 설치
 3. ExGame 실행 (가로 화면)
 
@@ -58,8 +66,8 @@ PC 세이브와 폰 세이브는 **기기가 달라 IndexedDB가 공유되지 �
 
 ## 업데이트 흐름
 
-GitHub Releases에는 **PC ZIP(`auto-run.bat`)만** 올립니다.  
-`www.zip` OTA / Releases용 APK는 사용하지 않습니다. 폰은 APK에 내장된 `assets/www`로 실행합니다.
+GitHub Releases에는 **PC ZIP**과 **서명 APK**를 올립니다.  
+`www.zip` OTA는 사용하지 않습니다. 폰은 APK에 내장된 `assets/www`로 실행합니다.
 
 ```powershell
 cd game

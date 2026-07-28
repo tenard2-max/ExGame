@@ -62,6 +62,9 @@ export class DomBlacksmithUi {
   private tab: TabId = 'waypoint';
   private selectedGearId: string | null = null;
   private selectedStackItemId: ItemId | null = null;
+  /** 강화/제조 후 전체 리렌더 시 스크롤 위치 유지용 */
+  private savedBodyScrollTop = 0;
+  private savedGearListScrollTop = 0;
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     if (!this.root) return;
     if (event.key === 'Escape' || event.code === 'Escape') {
@@ -106,10 +109,42 @@ export class DomBlacksmithUi {
     document.getElementById(STYLE_ID)?.remove();
   }
 
-  private render(): void {
+  private captureScroll(): void {
+    const body = this.root?.querySelector('.exgame-bs-body');
+    const gearList = this.root?.querySelector('.exgame-bs-gear-list');
+    this.savedBodyScrollTop = body instanceof HTMLElement ? body.scrollTop : 0;
+    this.savedGearListScrollTop = gearList instanceof HTMLElement
+      ? gearList.scrollTop
+      : 0;
+  }
+
+  private restoreScroll(): void {
+    const apply = (): void => {
+      const body = this.root?.querySelector('.exgame-bs-body');
+      const gearList = this.root?.querySelector('.exgame-bs-gear-list');
+      if (body instanceof HTMLElement) {
+        body.scrollTop = this.savedBodyScrollTop;
+      }
+      if (gearList instanceof HTMLElement) {
+        gearList.scrollTop = this.savedGearListScrollTop;
+      }
+    };
+    // 레이아웃·터치 스크롤 바인딩 이후 두 번 적용해 WebView에서도 유지
+    requestAnimationFrame(() => {
+      apply();
+      requestAnimationFrame(apply);
+    });
+  }
+
+  private render(options?: { preserveScroll?: boolean }): void {
     const root = this.root;
     const ctx = this.context;
     if (!root || !ctx) return;
+
+    const preserveScroll = options?.preserveScroll === true;
+    if (preserveScroll) {
+      this.captureScroll();
+    }
 
     const unlocked = ctx.service.canUseServices();
     const level = ctx.playerStats.getLevel();
@@ -168,6 +203,9 @@ export class DomBlacksmithUi {
 
     root.querySelector('.exgame-bs-close')?.addEventListener('click', () => this.close());
     bindNpcTouchScrollInRoot(root, ['.exgame-bs-body', '.exgame-bs-gear-list']);
+    if (preserveScroll) {
+      this.restoreScroll();
+    }
   }
 
   private renderCraft(body: HTMLElement, ctx: BlacksmithUiContext): void {
@@ -202,7 +240,7 @@ export class DomBlacksmithUi {
       const result = ctx.service.craft(recipe.id);
       ctx.showMessage(result.message);
       ctx.onGearChanged?.();
-      this.render();
+      this.render({ preserveScroll: true });
     });
     return card;
   }
@@ -362,7 +400,8 @@ export class DomBlacksmithUi {
         this.selectedStackItemId = null;
       }
       ctx.onGearChanged?.();
-      this.render();
+      // 연속 강화를 위해 스크롤·선택 상태를 유지한 채 갱신
+      this.render({ preserveScroll: true });
     });
   }
 
@@ -449,9 +488,9 @@ export class DomBlacksmithUi {
         pointer-events: auto;
         overflow: hidden;
       }
-      .exgame-bs-panel h2 { margin: 0; font-size: 26px; color: #ffd59a; }
-      .exgame-bs-panel h3 { margin: 0 0 8px; font-size: 15px; color: #e0c9a0; }
-      .exgame-bs-hint { margin: 0; font-size: 13px; color: #cbb898; line-height: 1.4; }
+      .exgame-bs-panel h2 { margin: 0; color: #ffd59a; }
+      .exgame-bs-panel h3 { margin: 0 0 8px; color: #e0c9a0; }
+      .exgame-bs-hint { margin: 0; color: #cbb898; line-height: 1.4; }
       .exgame-bs-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
       .exgame-bs-tab {
         padding: 8px 12px; border-radius: 8px; border: 1px solid #7a6240;
@@ -470,10 +509,10 @@ export class DomBlacksmithUi {
         display: flex; flex-direction: column; gap: 4px;
       }
       .exgame-bs-item.is-selected { border-color: #e0b060; background: #3d301c; }
-      .exgame-bs-item-sub { font-size: 12px; color: #b9a384; }
-      .exgame-bs-card-title { font-weight: 700; font-size: 16px; }
+      .exgame-bs-item-sub { color: #b9a384; }
+      .exgame-bs-card-title { font-weight: 700; }
       .exgame-bs-card-meta, .exgame-bs-card-mats, .exgame-bs-card-opts {
-        font-size: 12px; margin-top: 4px; color: #d2c0a0;
+        margin-top: 4px; color: #d2c0a0;
       }
       .exgame-bs-card-mats .ok { color: #8fdf8f; }
       .exgame-bs-card-mats .bad { color: #ff8f8f; }
@@ -495,8 +534,8 @@ export class DomBlacksmithUi {
       .exgame-bs-btn:disabled { opacity: 0.45; cursor: not-allowed; }
       .exgame-bs-btn:hover:not(:disabled) { background: #6e4e2c; }
       .exgame-bs-close { background: #3a342c; border-color: #6a6258; }
-      .exgame-bs-empty { color: #a89880; font-size: 13px; }
-      .exgame-bs-affix { margin: 2px 0; font-size: 13px; font-weight: 600; }
+      .exgame-bs-empty { color: #a89880; }
+      .exgame-bs-affix { margin: 2px 0; font-weight: 600; }
       .exgame-bs-affix.mythic {
         background: linear-gradient(90deg, #ffe566, #ffb000, #ffe566, #ffd700);
         background-size: 200% auto;

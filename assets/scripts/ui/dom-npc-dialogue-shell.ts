@@ -189,6 +189,16 @@ export function bindNpcTouchScrollInRoot(
 
 const fs = (px: number): string => `${+(px * NPC_MOBILE_FONT_SCALE).toFixed(2)}px`;
 
+/** 타이틀(h2)이 패널 내 최대 글자 크기. 그 외는 반드시 더 작음. */
+const NPC_TITLE_FS = '22px';
+const NPC_SUB_FS = '14px';
+const NPC_BODY_FS = '13px';
+const NPC_META_FS = '12px';
+const NPC_TITLE_FS_MOBILE = fs(26);
+const NPC_SUB_FS_MOBILE = fs(14);
+const NPC_BODY_FS_MOBILE = fs(12);
+const NPC_META_FS_MOBILE = fs(11);
+
 /** 각 NPC UI `ensureStyle`에 공통으로 합칩니다. */
 export const NPC_DIALOGUE_SHELL_CSS = `
   .exgame-npc-shell {
@@ -311,56 +321,92 @@ export const NPC_DIALOGUE_SHELL_CSS = `
     transform: none !important;
   }
 
-  /* 모바일: 타이포·여백을 데스크톱의 약 40%로 축소해 패널 안에 더 많은 내용을 표시 */
+  /*
+   * 타이포 계층: h2(타이틀) > 소제목/이름 > 본문/버튼 > 메타
+   * 어떤 요소도 타이틀보다 크면 안 됨 (WebView button UA 기본값 포함).
+   */
+  .exgame-mc-panel,
+  .exgame-bs-panel,
+  .exgame-bk-panel,
+  .exgame-tp-panel {
+    --npc-title-fs: ${NPC_TITLE_FS};
+    --npc-sub-fs: ${NPC_SUB_FS};
+    --npc-body-fs: ${NPC_BODY_FS};
+    --npc-meta-fs: ${NPC_META_FS};
+    font-size: var(--npc-body-fs) !important;
+  }
+  .exgame-mc-panel h2,
+  .exgame-bs-panel h2,
+  .exgame-bk-panel h2,
+  .exgame-tp-panel h2 {
+    font-size: var(--npc-title-fs) !important;
+    line-height: 1.25 !important;
+  }
+  .exgame-mc-panel h3,
+  .exgame-bs-panel h3,
+  .exgame-bk-panel h3,
+  .exgame-tp-panel h3,
+  .exgame-mc-name,
+  .exgame-bs-card-title,
+  .exgame-bk-item-name,
+  .exgame-tp-item-name {
+    font-size: var(--npc-sub-fs) !important;
+  }
+  .exgame-mc-panel :where(button, input, select, textarea),
+  .exgame-bs-panel :where(button, input, select, textarea),
+  .exgame-bk-panel :where(button, input, select, textarea),
+  .exgame-tp-panel :where(button, input, select, textarea),
+  .exgame-mc-btn,
+  .exgame-bs-btn,
+  .exgame-bk-btn,
+  .exgame-tp-btn,
+  .exgame-bs-tab,
+  .exgame-bk-tab,
+  .exgame-bs-item,
+  .exgame-bk-item,
+  .exgame-tp-item {
+    font-size: var(--npc-body-fs) !important;
+  }
+  .exgame-mc-hint,
+  .exgame-bs-hint,
+  .exgame-bk-hint,
+  .exgame-bk-sub,
+  .exgame-tp-hint,
+  .exgame-mc-meta,
+  .exgame-bs-item-sub,
+  .exgame-bs-card-meta,
+  .exgame-bs-card-mats,
+  .exgame-bs-card-opts,
+  .exgame-bs-affix,
+  .exgame-bs-empty,
+  .exgame-bk-empty,
+  .exgame-tp-empty,
+  .exgame-bk-item-coord,
+  .exgame-tp-item-coord {
+    font-size: var(--npc-meta-fs) !important;
+    line-height: 1.35 !important;
+  }
+
+  /* 모바일: 타이포·여백을 데스크톱의 약 40%로 축소 (타이틀이 여전히 최대) */
   body.exgame-mobile .exgame-mc-panel,
   body.exgame-mobile .exgame-bs-panel,
   body.exgame-mobile .exgame-bk-panel,
   body.exgame-mobile .exgame-tp-panel {
+    --npc-title-fs: ${NPC_TITLE_FS_MOBILE};
+    --npc-sub-fs: ${NPC_SUB_FS_MOBILE};
+    --npc-body-fs: ${NPC_BODY_FS_MOBILE};
+    --npc-meta-fs: ${NPC_META_FS_MOBILE};
     gap: 5px !important;
     padding: 7px 8px 6px !important;
     border-radius: 8px !important;
     border-width: 1px !important;
-  }
-  body.exgame-mobile .exgame-mc-panel h2,
-  body.exgame-mobile .exgame-bs-panel h2,
-  body.exgame-mobile .exgame-bk-panel h2,
-  body.exgame-mobile .exgame-tp-panel h2 {
-    font-size: ${fs(26)} !important;
+    font-size: var(--npc-body-fs) !important;
   }
   body.exgame-mobile .exgame-mc-panel h3,
   body.exgame-mobile .exgame-bs-panel h3,
   body.exgame-mobile .exgame-bk-panel h3,
   body.exgame-mobile .exgame-tp-panel h3 {
-    font-size: ${fs(15)} !important;
     margin-bottom: 3px !important;
-  }
-  body.exgame-mobile .exgame-mc-hint,
-  body.exgame-mobile .exgame-bs-hint,
-  body.exgame-mobile .exgame-bk-hint,
-  body.exgame-mobile .exgame-bk-sub,
-  body.exgame-mobile .exgame-tp-hint,
-  body.exgame-mobile .exgame-mc-empty,
-  body.exgame-mobile .exgame-bs-empty,
-  body.exgame-mobile .exgame-bk-empty,
-  body.exgame-mobile .exgame-tp-empty {
-    font-size: ${fs(13)} !important;
-    line-height: 1.35 !important;
-  }
-  body.exgame-mobile .exgame-mc-name,
-  body.exgame-mobile .exgame-bs-card-title,
-  body.exgame-mobile .exgame-bk-item-name,
-  body.exgame-mobile .exgame-tp-item-name {
-    font-size: ${fs(15)} !important;
-  }
-  body.exgame-mobile .exgame-mc-meta,
-  body.exgame-mobile .exgame-bs-item-sub,
-  body.exgame-mobile .exgame-bs-card-meta,
-  body.exgame-mobile .exgame-bs-card-mats,
-  body.exgame-mobile .exgame-bs-card-opts,
-  body.exgame-mobile .exgame-bs-affix,
-  body.exgame-mobile .exgame-bk-item-coord,
-  body.exgame-mobile .exgame-tp-item-coord {
-    font-size: ${fs(12)} !important;
   }
   body.exgame-mobile .exgame-mc-btn,
   body.exgame-mobile .exgame-bs-btn,
@@ -369,8 +415,8 @@ export const NPC_DIALOGUE_SHELL_CSS = `
   body.exgame-mobile .exgame-bs-tab,
   body.exgame-mobile .exgame-bk-tab,
   body.exgame-mobile .exgame-tp-item,
-  body.exgame-mobile .exgame-bk-item {
-    font-size: ${fs(14)} !important;
+  body.exgame-mobile .exgame-bk-item,
+  body.exgame-mobile .exgame-bs-item {
     padding: 4px 6px !important;
     border-radius: 4px !important;
   }
@@ -393,7 +439,6 @@ export const NPC_DIALOGUE_SHELL_CSS = `
   body.exgame-mobile .exgame-bs-row input,
   body.exgame-mobile .exgame-bk-row input,
   body.exgame-mobile .exgame-tp-row input {
-    font-size: ${fs(14)} !important;
     padding: 4px 5px !important;
   }
   body.exgame-mobile .exgame-bs-tabs,

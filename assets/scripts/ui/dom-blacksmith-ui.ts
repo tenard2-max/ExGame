@@ -33,7 +33,9 @@ import {
 } from '../npc/teleporter-config';
 import {
   NPC_DIALOGUE_SHELL_CSS,
+  bindNpcTouchScrollInRoot,
   ensureNpcDialogueShellStyle,
+  guardNpcRootEvents,
   wrapNpcDialogueShell,
 } from '../ui/dom-npc-dialogue-shell';
 import { setBlacksmithMenuOpen } from '../ui/hud-layout';
@@ -79,9 +81,7 @@ export class DomBlacksmithUi {
     this.root?.remove();
     const root = document.createElement('div');
     root.id = ROOT_ID;
-    root.addEventListener('mousedown', (event) => event.stopPropagation());
-    root.addEventListener('click', (event) => event.stopPropagation());
-    root.addEventListener('wheel', (event) => event.stopPropagation());
+    guardNpcRootEvents(root);
     document.body.appendChild(root);
     this.root = root;
     setBlacksmithMenuOpen(true);
@@ -167,6 +167,7 @@ export class DomBlacksmithUi {
     }
 
     root.querySelector('.exgame-bs-close')?.addEventListener('click', () => this.close());
+    bindNpcTouchScrollInRoot(root, ['.exgame-bs-body', '.exgame-bs-gear-list']);
   }
 
   private renderCraft(body: HTMLElement, ctx: BlacksmithUiContext): void {
@@ -446,6 +447,7 @@ export class DomBlacksmithUi {
         border: 2px solid #c4a574; color: #f3e8d5;
         box-shadow: 0 18px 48px rgba(0,0,0,0.5);
         pointer-events: auto;
+        overflow: hidden;
       }
       .exgame-bs-panel h2 { margin: 0; font-size: 26px; color: #ffd59a; }
       .exgame-bs-panel h3 { margin: 0 0 8px; font-size: 15px; color: #e0c9a0; }

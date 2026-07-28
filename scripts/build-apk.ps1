@@ -6,8 +6,16 @@ $ErrorActionPreference = "Stop"
 
 $projectPath = Split-Path -Parent $PSScriptRoot
 $androidDir = Join-Path $projectPath "mobile\android"
-$studioJbr = "I:\Program Files\Android\Android Studio\jbr"
-$sdk = "C:\Users\lee\AppData\Local\Android\Sdk"
+$studioJbr = "C:\Program Files\Android\Android Studio\jbr"
+if (-not (Test-Path "$studioJbr\bin\java.exe")) {
+    $studioJbr = "I:\Program Files\Android\Android Studio\jbr"
+}
+$sdkCandidates = @(
+    (Join-Path $env:LOCALAPPDATA "Android\Sdk"),
+    "C:\Users\lee\AppData\Local\Android\Sdk",
+    "C:\Android\Sdk"
+)
+$sdk = $sdkCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 $tools = Join-Path (Split-Path -Parent $projectPath) "tools"
 if (-not (Test-Path $tools)) {
     $tools = Join-Path $projectPath "tools"
@@ -21,8 +29,8 @@ $version = [string]$packageJson.version
 if (-not (Test-Path "$studioJbr\bin\java.exe")) {
     throw "Android Studio JBR not found: $studioJbr"
 }
-if (-not (Test-Path $sdk)) {
-    throw "Android SDK not found: $sdk"
+if (-not $sdk -or -not (Test-Path $sdk)) {
+    throw "Android SDK not found. Install SDK 34 under %LOCALAPPDATA%\Android\Sdk"
 }
 
 $env:JAVA_HOME = $studioJbr

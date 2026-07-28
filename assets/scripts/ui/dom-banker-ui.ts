@@ -25,7 +25,9 @@ import {
 } from '../npc/banker-config';
 import {
   NPC_DIALOGUE_SHELL_CSS,
+  bindNpcTouchScrollInRoot,
   ensureNpcDialogueShellStyle,
+  guardNpcRootEvents,
   wrapNpcDialogueShell,
 } from '../ui/dom-npc-dialogue-shell';
 import { setBankerMenuOpen } from '../ui/hud-layout';
@@ -75,9 +77,7 @@ export class DomBankerUi {
     this.root?.remove();
     const root = document.createElement('div');
     root.id = ROOT_ID;
-    root.addEventListener('mousedown', (event) => event.stopPropagation());
-    root.addEventListener('click', (event) => event.stopPropagation());
-    root.addEventListener('wheel', (event) => event.stopPropagation());
+    guardNpcRootEvents(root);
     document.body.appendChild(root);
     this.root = root;
     setBankerMenuOpen(true);
@@ -166,6 +166,7 @@ export class DomBankerUi {
     root.querySelector('.exgame-bk-close')?.addEventListener('click', () => {
       this.close();
     });
+    bindNpcTouchScrollInRoot(root, ['.exgame-bk-body', '.exgame-bk-list']);
   }
 
   private renderVault(body: HTMLElement, ctx: BankerUiContext): void {
@@ -400,6 +401,7 @@ export class DomBankerUi {
         border: 2px solid #6ab0d8; color: #e8f4ff;
         box-shadow: 0 18px 48px rgba(0,0,0,0.5);
         pointer-events: auto;
+        overflow: hidden;
       }
       .exgame-bk-panel h2 { margin: 0; font-size: 26px; color: #9fd4ff; }
       .exgame-bk-panel h3 { margin: 0 0 6px; font-size: 15px; color: #b8d8f0; }

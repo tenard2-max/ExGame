@@ -21,6 +21,9 @@ const SHELL_STYLE_ID = 'exgame-npc-dialogue-shell-style';
 const PORTRAIT_SHIFT_DESKTOP_PX = 48;
 const PANEL_SHIFT_DESKTOP_PX = 32;
 
+/** 모바일 NPC 패널 타이포 배율(데스크톱 대비). */
+export const NPC_MOBILE_FONT_SCALE = 0.4;
+
 /**
  * 빌드 산출물 `ui/portraits/*.png`.
  * origin 절대경로(`/ui/...`)는 Android WebView(`.../assets/www/`)에서 깨지므로
@@ -76,6 +79,115 @@ export function ensureNpcDialogueShellStyle(): void {
   style.textContent = NPC_DIALOGUE_SHELL_CSS;
   document.head.appendChild(style);
 }
+
+/**
+ * NPC 오버레이 루트에서 DOM 이벤트가 캔버스로 새지 않게 막습니다.
+ * (월드 이동은 hud-layout 모달 플래그로도 차단되지만, WebView 이중 입력을 방지합니다.)
+ */
+export function guardNpcRootEvents(root: HTMLElement): void {
+  const stop = (event: Event): void => {
+    event.stopPropagation();
+  };
+  const types: Array<keyof HTMLElementEventMap> = [
+    'mousedown',
+    'mouseup',
+    'mousemove',
+    'click',
+    'wheel',
+    'touchstart',
+    'touchmove',
+    'touchend',
+    'touchcancel',
+    'pointerdown',
+    'pointermove',
+    'pointerup',
+    'pointercancel',
+  ];
+  for (const type of types) {
+    root.addEventListener(type, stop, { passive: true });
+  }
+}
+
+/**
+ * 스크롤 영역에 손가락 드래그 스크롤을 연결합니다.
+ * 스크롤바 없이 pan-y만 쓰고, 터치가 월드/핀치로 새지 않게 막습니다.
+ */
+export function bindNpcTouchScroll(scrollEl: HTMLElement): void {
+  scrollEl.classList.add('exgame-npc-scroll');
+
+  let active = false;
+  let dragging = false;
+  let startY = 0;
+  let startScrollTop = 0;
+  const dragThresholdPx = 8;
+
+  scrollEl.addEventListener(
+    'touchstart',
+    (event) => {
+      if (event.touches.length !== 1) return;
+      active = true;
+      dragging = false;
+      startY = event.touches[0]!.clientY;
+      startScrollTop = scrollEl.scrollTop;
+      event.stopPropagation();
+    },
+    { passive: true },
+  );
+
+  scrollEl.addEventListener(
+    'touchmove',
+    (event) => {
+      if (!active || event.touches.length !== 1) return;
+      const dy = startY - event.touches[0]!.clientY;
+      const maxScroll = Math.max(0, scrollEl.scrollHeight - scrollEl.clientHeight);
+      if (maxScroll <= 0) {
+        event.stopPropagation();
+        return;
+      }
+      if (!dragging && Math.abs(dy) < dragThresholdPx) {
+        event.stopPropagation();
+        return;
+      }
+      dragging = true;
+      scrollEl.scrollTop = Math.min(maxScroll, Math.max(0, startScrollTop + dy));
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    { passive: false },
+  );
+
+  const end = (event: TouchEvent): void => {
+    active = false;
+    dragging = false;
+    event.stopPropagation();
+  };
+  scrollEl.addEventListener('touchend', end, { passive: true });
+  scrollEl.addEventListener('touchcancel', end, { passive: true });
+
+  scrollEl.addEventListener(
+    'wheel',
+    (event) => {
+      event.stopPropagation();
+    },
+    { passive: true },
+  );
+}
+
+/** 루트 안에서 스크롤 후보를 찾아 터치 스크롤을 연결합니다. */
+export function bindNpcTouchScrollInRoot(
+  root: HTMLElement,
+  selectors: readonly string[],
+): void {
+  for (const selector of selectors) {
+    root.querySelectorAll(selector).forEach((node) => {
+      if (node instanceof HTMLElement) {
+        bindNpcTouchScroll(node);
+      }
+    });
+  }
+}
+
+const fs = (px: number): string => `${+(px * NPC_MOBILE_FONT_SCALE).toFixed(2)}px`;
 
 /** 각 NPC UI `ensureStyle`에 공통으로 합칩니다. */
 export const NPC_DIALOGUE_SHELL_CSS = `
@@ -138,6 +250,22 @@ export const NPC_DIALOGUE_SHELL_CSS = `
     box-sizing: border-box;
   }
 
+  .exgame-npc-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    scrollbar-width: none;
+  }
+  .exgame-npc-scroll::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
   @media (max-height: 520px), (max-width: 900px) {
     .exgame-npc-shell {
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -177,10 +305,105 @@ export const NPC_DIALOGUE_SHELL_CSS = `
     justify-content: flex-end;
   }
   body.exgame-mobile .exgame-npc-panel-col > * {
-    width: min(100%, 340px) !important;
-    max-width: min(44vw, 360px) !important;
-    max-height: min(84vh, 620px) !important;
+    width: min(100%, 360px) !important;
+    max-width: min(48vw, 380px) !important;
+    max-height: min(88vh, 680px) !important;
     transform: none !important;
+  }
+
+  /* 모바일: 타이포·여백을 데스크톱의 약 40%로 축소해 패널 안에 더 많은 내용을 표시 */
+  body.exgame-mobile .exgame-mc-panel,
+  body.exgame-mobile .exgame-bs-panel,
+  body.exgame-mobile .exgame-bk-panel,
+  body.exgame-mobile .exgame-tp-panel {
+    gap: 5px !important;
+    padding: 7px 8px 6px !important;
+    border-radius: 8px !important;
+    border-width: 1px !important;
+  }
+  body.exgame-mobile .exgame-mc-panel h2,
+  body.exgame-mobile .exgame-bs-panel h2,
+  body.exgame-mobile .exgame-bk-panel h2,
+  body.exgame-mobile .exgame-tp-panel h2 {
+    font-size: ${fs(26)} !important;
+  }
+  body.exgame-mobile .exgame-mc-panel h3,
+  body.exgame-mobile .exgame-bs-panel h3,
+  body.exgame-mobile .exgame-bk-panel h3,
+  body.exgame-mobile .exgame-tp-panel h3 {
+    font-size: ${fs(15)} !important;
+    margin-bottom: 3px !important;
+  }
+  body.exgame-mobile .exgame-mc-hint,
+  body.exgame-mobile .exgame-bs-hint,
+  body.exgame-mobile .exgame-bk-hint,
+  body.exgame-mobile .exgame-bk-sub,
+  body.exgame-mobile .exgame-tp-hint,
+  body.exgame-mobile .exgame-mc-empty,
+  body.exgame-mobile .exgame-bs-empty,
+  body.exgame-mobile .exgame-bk-empty,
+  body.exgame-mobile .exgame-tp-empty {
+    font-size: ${fs(13)} !important;
+    line-height: 1.35 !important;
+  }
+  body.exgame-mobile .exgame-mc-name,
+  body.exgame-mobile .exgame-bs-card-title,
+  body.exgame-mobile .exgame-bk-item-name,
+  body.exgame-mobile .exgame-tp-item-name {
+    font-size: ${fs(15)} !important;
+  }
+  body.exgame-mobile .exgame-mc-meta,
+  body.exgame-mobile .exgame-bs-item-sub,
+  body.exgame-mobile .exgame-bs-card-meta,
+  body.exgame-mobile .exgame-bs-card-mats,
+  body.exgame-mobile .exgame-bs-card-opts,
+  body.exgame-mobile .exgame-bs-affix,
+  body.exgame-mobile .exgame-bk-item-coord,
+  body.exgame-mobile .exgame-tp-item-coord {
+    font-size: ${fs(12)} !important;
+  }
+  body.exgame-mobile .exgame-mc-btn,
+  body.exgame-mobile .exgame-bs-btn,
+  body.exgame-mobile .exgame-bk-btn,
+  body.exgame-mobile .exgame-tp-btn,
+  body.exgame-mobile .exgame-bs-tab,
+  body.exgame-mobile .exgame-bk-tab,
+  body.exgame-mobile .exgame-tp-item,
+  body.exgame-mobile .exgame-bk-item {
+    font-size: ${fs(14)} !important;
+    padding: 4px 6px !important;
+    border-radius: 4px !important;
+  }
+  body.exgame-mobile .exgame-mc-section,
+  body.exgame-mobile .exgame-bs-card,
+  body.exgame-mobile .exgame-bs-item,
+  body.exgame-mobile .exgame-bs-wp-row,
+  body.exgame-mobile .exgame-bk-section,
+  body.exgame-mobile .exgame-tp-section {
+    padding: 4px 5px !important;
+    border-radius: 5px !important;
+  }
+  body.exgame-mobile .exgame-mc-row,
+  body.exgame-mobile .exgame-bs-row,
+  body.exgame-mobile .exgame-bk-row,
+  body.exgame-mobile .exgame-tp-row {
+    gap: 4px !important;
+    padding: 3px 4px !important;
+  }
+  body.exgame-mobile .exgame-bs-row input,
+  body.exgame-mobile .exgame-bk-row input,
+  body.exgame-mobile .exgame-tp-row input {
+    font-size: ${fs(14)} !important;
+    padding: 4px 5px !important;
+  }
+  body.exgame-mobile .exgame-bs-tabs,
+  body.exgame-mobile .exgame-bk-tabs {
+    gap: 4px !important;
+  }
+  body.exgame-mobile .exgame-bs-gear-list,
+  body.exgame-mobile .exgame-bk-list,
+  body.exgame-mobile .exgame-tp-list {
+    max-height: none !important;
   }
 `;
 

@@ -14,7 +14,9 @@ import {
 } from '../npc/merchant-config';
 import {
   NPC_DIALOGUE_SHELL_CSS,
+  bindNpcTouchScrollInRoot,
   ensureNpcDialogueShellStyle,
+  guardNpcRootEvents,
   wrapNpcDialogueShell,
 } from '../ui/dom-npc-dialogue-shell';
 import { setMerchantMenuOpen } from '../ui/hud-layout';
@@ -54,9 +56,7 @@ export class DomMerchantUi {
     this.root?.remove();
     const root = document.createElement('div');
     root.id = ROOT_ID;
-    root.addEventListener('mousedown', (event) => event.stopPropagation());
-    root.addEventListener('click', (event) => event.stopPropagation());
-    root.addEventListener('wheel', (event) => event.stopPropagation());
+    guardNpcRootEvents(root);
     document.body.appendChild(root);
     this.root = root;
     setMerchantMenuOpen(true);
@@ -114,6 +114,8 @@ export class DomMerchantUi {
     root.querySelector('.exgame-mc-close')?.addEventListener('click', () => {
       this.close();
     });
+
+    bindNpcTouchScrollInRoot(root, ['.exgame-mc-sections']);
   }
 
   private buildCategory(
@@ -212,6 +214,7 @@ export class DomMerchantUi {
         border: 2px solid #d4b06a; color: #f6efe3;
         box-shadow: 0 18px 48px rgba(0,0,0,0.5);
         pointer-events: auto;
+        overflow: hidden;
       }
       .exgame-mc-panel h2 { margin: 0; font-size: 26px; color: #ffd98a; }
       .exgame-mc-panel h3 {
@@ -219,7 +222,12 @@ export class DomMerchantUi {
       }
       .exgame-mc-hint { margin: 0; font-size: 13px; color: #cbb8a0; }
       .exgame-mc-sections {
-        overflow-y: auto; display: flex; flex-direction: column; gap: 12px;
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
       }
       .exgame-mc-section {
         background: rgba(255,255,255,0.04);

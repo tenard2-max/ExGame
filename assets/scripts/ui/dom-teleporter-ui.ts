@@ -18,7 +18,9 @@ import {
 } from '../npc/teleporter-config';
 import {
   NPC_DIALOGUE_SHELL_CSS,
+  bindNpcTouchScrollInRoot,
   ensureNpcDialogueShellStyle,
+  guardNpcRootEvents,
   wrapNpcDialogueShell,
 } from '../ui/dom-npc-dialogue-shell';
 import { setTeleporterMenuOpen } from '../ui/hud-layout';
@@ -65,9 +67,7 @@ export class DomTeleporterUi {
     this.root?.remove();
     const root = document.createElement('div');
     root.id = ROOT_ID;
-    root.addEventListener('mousedown', (event) => event.stopPropagation());
-    root.addEventListener('click', (event) => event.stopPropagation());
-    root.addEventListener('wheel', (event) => event.stopPropagation());
+    guardNpcRootEvents(root);
     document.body.appendChild(root);
     this.root = root;
     setTeleporterMenuOpen(true);
@@ -180,6 +180,7 @@ export class DomTeleporterUi {
       this.handleDelete();
     });
     this.syncSelectionButtons();
+    bindNpcTouchScrollInRoot(root, ['.exgame-tp-list']);
   }
 
   private buildWaypointRow(waypoint: TeleportWaypoint): HTMLButtonElement {
@@ -338,6 +339,7 @@ export class DomTeleporterUi {
         box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
         color: #e8f1ff;
         pointer-events: auto;
+        overflow: hidden;
       }
       .exgame-tp-panel h2 {
         margin: 0;
@@ -391,6 +393,8 @@ export class DomTeleporterUi {
         font-size: 14px;
       }
       .exgame-tp-list {
+        flex: 1 1 auto;
+        min-height: 0;
         overflow-y: auto;
         max-height: 340px;
         display: flex;

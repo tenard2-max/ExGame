@@ -35,13 +35,21 @@ Write-Host "[4/4] APK 빌드 시도..."
 $apkBuilt = $false
 
 # Android Studio JBR / SDK 환경
-$studioJbr = "I:\Program Files\Android\Android Studio\jbr"
+$studioJbr = "C:\Program Files\Android\Android Studio\jbr"
+if (-not (Test-Path -LiteralPath (Join-Path $studioJbr "bin\java.exe"))) {
+  $studioJbr = "I:\Program Files\Android\Android Studio\jbr"
+}
 if (Test-Path -LiteralPath (Join-Path $studioJbr "bin\java.exe")) {
   $env:JAVA_HOME = $studioJbr
   $env:Path = "$studioJbr\bin;" + $env:Path
 }
-$sdkDir = "C:\Users\lee\AppData\Local\Android\Sdk"
-if (Test-Path -LiteralPath $sdkDir) {
+$sdkDirCandidates = @(
+  (Join-Path $env:LOCALAPPDATA "Android\Sdk"),
+  "C:\Users\lee\AppData\Local\Android\Sdk",
+  "C:\Android\Sdk"
+)
+$sdkDir = $sdkDirCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if ($sdkDir) {
   $env:ANDROID_HOME = $sdkDir
   $env:ANDROID_SDK_ROOT = $sdkDir
   $localProps = Join-Path $androidDir "local.properties"

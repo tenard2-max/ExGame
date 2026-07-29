@@ -45,8 +45,14 @@ if (-not $SkipSync) {
 
 Write-Host "[2/2] 로컬 서버 기동 + 브라우저 열기..."
 $startServer = Join-Path $scriptDirectory "start-server.ps1"
+# 배포 ZIP을 새로 풀어도 7456에 옛 서버가 남아 있으면 예전 UI가 그대로 보인다.
+# auto-run은 항상 포트를 비우고 현재 폴더 기준으로 서버를 다시 띄운다.
+$restart = $true
+if ($PSBoundParameters.ContainsKey('ForceRestart') -and -not $ForceRestart) {
+    $restart = $false
+}
 $args = @{ Port = $Port }
-if ($ForceRestart) {
+if ($restart) {
     $args.ForceRestart = $true
 }
 & $startServer @args

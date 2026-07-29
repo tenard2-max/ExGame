@@ -119,12 +119,35 @@ if (-not $pythonCmd) {
     throw "로컬 서버 실행에는 Python(py 또는 python)이 필요합니다. https://www.python.org/downloads/ 에서 설치 후 다시 실행하세요."
 }
 
-$url = "http://127.0.0.1:$Port/?offline=1&fullscreen=1"
+$urlVersion = ""
+try {
+    $pkgPath = Join-Path (Split-Path -Parent $scriptDirectory) "package.json"
+    if (-not (Test-Path -LiteralPath $pkgPath)) {
+        $pkgPath = Join-Path $gameRoot "package.json"
+    }
+    # 배포 패키지에는 package.json이 없을 수 있어 index/settings 대신 폴더명 사용
+    if (Test-Path -LiteralPath $pkgPath) {
+        $pkg = Get-Content -LiteralPath $pkgPath -Raw | ConvertFrom-Json
+        $urlVersion = [string]$pkg.version
+    } else {
+        $urlVersion = Split-Path -Leaf $gameRoot
+    }
+} catch {
+    $urlVersion = "local"
+}
+$url = "http://127.0.0.1:$Port/?offline=1&fullscreen=1&v=$([uri]::EscapeDataString($urlVersion))"
 $portBusy = Test-LocalPortOpen $Port
 
-if ($ForceRestart -and $portBusy) {
-    Stop-ListenersOnPort $Port
-    $portBusy = $false
+# 기본: 포트가 점유되어 있으면 재시작 (옛 빌드 재사용 방지)
+# 명시적으로 -ForceRestart:$false 를 준 경우에만 재사용
+if ($portBusy) {
+    if ($PSBoundParameters.ContainsKey('ForceRestart') -and -not $ForceRestart) {
+        Write-Host "포트 $Port 재사용 요청됨 (-ForceRestart:`$false)"
+    } else {
+        Write-Host "포트 $Port 기존 서버 종료 후 현재 경로로 재기동..."
+        Stop-ListenersOnPort $Port
+        $portBusy = $false
+    }
 }
 
 Write-Host "========================================"

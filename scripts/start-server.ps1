@@ -119,13 +119,12 @@ if (-not $pythonCmd) {
     throw "로컬 서버 실행에는 Python(py 또는 python)이 필요합니다. https://www.python.org/downloads/ 에서 설치 후 다시 실행하세요."
 }
 
-$urlVersion = ""
+$urlVersion = "local"
 try {
     $pkgPath = Join-Path (Split-Path -Parent $scriptDirectory) "package.json"
     if (-not (Test-Path -LiteralPath $pkgPath)) {
         $pkgPath = Join-Path $gameRoot "package.json"
     }
-    # 배포 패키지에는 package.json이 없을 수 있어 index/settings 대신 폴더명 사용
     if (Test-Path -LiteralPath $pkgPath) {
         $pkg = Get-Content -LiteralPath $pkgPath -Raw | ConvertFrom-Json
         $urlVersion = [string]$pkg.version
@@ -135,35 +134,37 @@ try {
 } catch {
     $urlVersion = "local"
 }
-$url = "http://127.0.0.1:$Port/?offline=1&fullscreen=1&v=$([uri]::EscapeDataString($urlVersion))"
+$versionQuery = [uri]::EscapeDataString($urlVersion)
+$url = "http://127.0.0.1:$Port/?offline=1&fullscreen=1&v=$versionQuery"
 $portBusy = Test-LocalPortOpen $Port
 
-# 기본: 포트가 점유되어 있으면 재시작 (옛 빌드 재사용 방지)
-# 명시적으로 -ForceRestart:$false 를 준 경우에만 재사용
+# Restart occupied port by default so an old build is not reused.
+# Only reuse when caller passes -ForceRestart:$false explicitly.
 if ($portBusy) {
-    if ($PSBoundParameters.ContainsKey('ForceRestart') -and -not $ForceRestart) {
-        Write-Host "포트 $Port 재사용 요청됨 (-ForceRestart:`$false)"
+    $reuseRequested = $PSBoundParameters.ContainsKey('ForceRestart') -and (-not $ForceRestart)
+    if ($reuseRequested) {
+        Write-Host "Reusing port $Port (-ForceRestart:false)"
     } else {
-        Write-Host "포트 $Port 기존 서버 종료 후 현재 경로로 재기동..."
+        Write-Host "Stopping existing server on port $Port ..."
         Stop-ListenersOnPort $Port
         $portBusy = $false
     }
 }
 
 Write-Host "========================================"
-Write-Host " ExGame 로컬 서버"
+Write-Host " ExGame local server"
 Write-Host "========================================"
-Write-Host "접속: $url"
-Write-Host "경로: $gameRoot"
+Write-Host "URL : $url"
+Write-Host "Root: $gameRoot"
 Write-Host "Python: $($pythonCmd.FilePath)"
 Write-Host ""
 
 if ($portBusy) {
-    Write-Host "포트 $Port 에 이미 서버가 실행 중입니다. 기존 서버를 재사용합니다."
+    Write-Host "Port $Port already in use. Reusing existing server."
     if (-not $NoBrowser) {
         Open-GameInFullscreenBrowser $url
     }
-    Write-Host "브라우저만 열었습니다. (서버 재기동: start-server.bat -ForceRestart)"
+    Write-Host "Opened browser only."
     return
 }
 

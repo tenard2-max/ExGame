@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.30 — 2026-07-29
+
+### 추가
+- Media Timeline Editor (MP4 생성): MP3 Master Timeline, 작업폴더, VIDEO/IMAGE 클립 DnD
+- 클립 균등 배치·PNG 균등 리사이즈(MP4 고유길이 유지)·삭제·Scale/Opacity·인접 Fade
+- Preview (MP3 + VIDEO + IMAGE Overlay)
+- Export: 로컬 Python 서버 + 동봉 ffmpeg.exe (해상도/FPS 옵션)
+
 ## 0.1.29 — 2026-07-28
 
 ### 수정

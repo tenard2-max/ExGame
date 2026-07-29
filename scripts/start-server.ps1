@@ -144,11 +144,29 @@ if ($portBusy) {
     return
 }
 
-# 서버를 먼저 띄운 뒤, 포트가 열리면 브라우저를 엽니다.
-# (이전에는 브라우저를 먼저 열어 '이 페이지가 작동하지 않습니다'가 자주 났습니다.)
+# Media Editor Export API 가 포함된 로컬 서버를 기동합니다.
+# (fallback: 스크립트 없으면 python -m http.server)
+$localServerPyCandidates = @(
+    (Join-Path $scriptDirectory "exgame-local-server.py"),
+    (Join-Path (Split-Path -Parent $scriptDirectory) "scripts\exgame-local-server.py"),
+    (Join-Path $gameRoot "exgame-local-server.py")
+)
+$localServerPy = $localServerPyCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+
 $argList = @()
 $argList += $pythonCmd.PrefixArgs
-$argList += @("-m", "http.server", "$Port", "--bind", "127.0.0.1", "--directory", $gameRoot)
+if ($localServerPy) {
+    $argList += @(
+        $localServerPy,
+        "--port", "$Port",
+        "--bind", "127.0.0.1",
+        "--directory", $gameRoot
+    )
+    Write-Host "서버 스크립트: $localServerPy"
+} else {
+    Write-Host "경고: exgame-local-server.py 없음 — 정적 http.server 로 기동 (Export API 불가)"
+    $argList += @("-m", "http.server", "$Port", "--bind", "127.0.0.1", "--directory", $gameRoot)
+}
 
 Write-Host "서버 기동 중..."
 $server = Start-Process `

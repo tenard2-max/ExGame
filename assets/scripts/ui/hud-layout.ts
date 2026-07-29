@@ -127,6 +127,8 @@ let potionMenuOpen = false;
 let inventoryMenuOpen = false;
 /** 불러오기 목록이 열려 있을 때 월드 탭을 막습니다. */
 let loadMenuOpen = false;
+/** Media Timeline Editor 가 열려 있을 때 월드 입력·휠 줌을 막습니다. */
+let mediaEditorOpen = false;
 /** 텔레포터 UI가 열려 있을 때 월드 탭을 막습니다. */
 let teleporterMenuOpen = false;
 /** 대장장이 UI가 열려 있을 때 월드 탭을 막습니다. */
@@ -168,12 +170,21 @@ export function isLoadMenuOpen(): boolean {
   return loadMenuOpen;
 }
 
+export function setMediaEditorOpen(isOpen: boolean): void {
+  mediaEditorOpen = isOpen;
+}
+
+export function isMediaEditorOpen(): boolean {
+  return mediaEditorOpen;
+}
+
 /** 모달 UI가 열려 포인터 이동/탭을 월드에 넘기면 안 될 때. */
 export function isModalMenuBlockingPointer(): boolean {
   return settingsPanelOpen
     || potionMenuOpen
     || inventoryMenuOpen
     || loadMenuOpen
+    || mediaEditorOpen
     || teleporterMenuOpen
     || blacksmithMenuOpen
     || merchantMenuOpen

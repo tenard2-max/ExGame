@@ -9,6 +9,7 @@ import {
   matchesKeyCode,
 } from '../input/dom-keyboard';
 import type { SaveSessionController } from '../save/save-session-controller';
+import { openMediaTimelineEditor } from './dom-media-timeline-editor';
 import { isMobileShell } from './mobile-shell';
 
 const ROOT_ID = 'exgame-save-controls';
@@ -35,7 +36,9 @@ export class DomSaveControlsUi {
       this.saveSession?.openLoadMenu();
       return;
     }
-    const button = this.buttons.find((entry) => matchesKeyCode(event, entry.code));
+    const button = this.buttons.find(
+      (entry) => entry.code && matchesKeyCode(event, entry.code),
+    );
     if (!button) return;
     consumeKeyEvent(event);
     button.action();
@@ -73,6 +76,12 @@ export class DomSaveControlsUi {
           void this.saveSession?.startNewGame();
         },
         danger: true,
+      },
+      {
+        id: 'media',
+        code: '',
+        label: 'MP4 생성',
+        action: () => openMediaTimelineEditor(),
       },
     ];
     this.ensureStyle();

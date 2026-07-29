@@ -30,7 +30,9 @@ $launcherScripts = @(
     "run-offline.ps1", "run-offline.bat",
     "start-server.ps1", "start-server.bat",
     "auto-run.ps1", "auto-run.bat",
-    "sync-runtime-atlases.ps1"
+    "sync-runtime-atlases.ps1",
+    "exgame-local-server.py",
+    "fetch-ffmpeg.ps1"
 )
 foreach ($name in $launcherScripts) {
     $src = Join-Path $PSScriptRoot $name
@@ -40,8 +42,23 @@ foreach ($name in $launcherScripts) {
 }
 Copy-Item -LiteralPath (Join-Path $projectPath "docs\OFFLINE.md") -Destination (Join-Path $packagePath "OFFLINE.md") -Force
 
+# Media Editor: ffmpeg.exe 동봉(있으면)
+$ffmpegSrc = Join-Path $projectPath "tools\ffmpeg\ffmpeg.exe"
+$ffmpegDestDir = Join-Path $packagePath "tools\ffmpeg"
+New-Item -ItemType Directory -Force -Path $ffmpegDestDir | Out-Null
+$ffmpegReadme = Join-Path $projectPath "tools\ffmpeg\README.md"
+if (Test-Path -LiteralPath $ffmpegReadme) {
+    Copy-Item -LiteralPath $ffmpegReadme -Destination (Join-Path $ffmpegDestDir "README.md") -Force
+}
+if (Test-Path -LiteralPath $ffmpegSrc) {
+    Copy-Item -LiteralPath $ffmpegSrc -Destination (Join-Path $ffmpegDestDir "ffmpeg.exe") -Force
+    Write-Host "ffmpeg.exe bundled"
+} else {
+    Write-Host "WARN: tools/ffmpeg/ffmpeg.exe missing - run fetch-ffmpeg.ps1 before Export"
+}
+
 if (-not (Test-Path -LiteralPath (Join-Path $packagePath "index.html"))) {
-    throw "패키지에 index.html이 없습니다. 빌드 산출물 복사를 확인하세요."
+    throw "index.html missing in package. Check web build copy."
 }
 
 $zipPath = Join-Path $releaseRoot "$packageName.zip"
@@ -50,7 +67,7 @@ if (Test-Path -LiteralPath $zipPath) {
 }
 Compress-Archive -Path $packagePath -DestinationPath $zipPath -Force
 
-Write-Host "배포 패키지 생성 완료:"
-Write-Host "  폴더: $packagePath"
-Write-Host "  ZIP : $zipPath"
-Write-Host "실행: $packagePath\auto-run.bat (또는 run-offline.bat)"
+Write-Host "Package ready:"
+Write-Host "  folder: $packagePath"
+Write-Host "  ZIP   : $zipPath"
+Write-Host "Run: $packagePath\auto-run.bat"

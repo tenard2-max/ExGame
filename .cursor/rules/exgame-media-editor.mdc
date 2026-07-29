@@ -1,0 +1,41 @@
+---
+description: ExGame Media Timeline Editor — 파일 보호·범위 제한·독립 모듈 원칙
+alwaysApply: true
+---
+
+# Media Editor 개발 원칙
+
+Media Timeline Editor / MP4 생성 기능을 구현·수정할 때 반드시 따른다.
+
+## 파일 보호 (Non-Destructive)
+
+- 원본 MP3 / MP4 / PNG / JPG 파일은 **절대 수정하지 않는다**.
+- 모든 편집은 Non-Destructive 방식이다.
+- Timeline에는 **원본 파일 참조 + 편집 Parameter**만 저장한다.
+- Export 시에만 **새 MP4**를 생성한다. 원본을 덮어쓰지 않는다.
+
+## 구현 범위 제한 (이 버전에서 만들지 않음)
+
+- 전문 영상 편집기 / 자르기 편집기
+- Color Grading / Transition Library / 자막 편집기
+- AI 영상·음악 생성
+- Multi Audio Mixing / 녹음 / 전문 Audio Editor
+- Premiere 수준 Multi Track Editor
+
+기능 확장 욕심으로 구조를 과도하게 복잡하게 만들지 않는다.
+
+## 개발 원칙
+
+- **기존 ExGame을 망가뜨리지 않는다.**
+- Media Editor는 가능한 **독립 Module**로 구현한다 (`assets/scripts/media/`, `dom-media-timeline-editor.ts` 등).
+- 기존 기능 수정이 필요하면 범위를 **최소화**한다.
+  - 허용 예: 「새로 시작」 아래 「MP4 생성」 버튼 연결, 모달 플래그.
+- **대규모 리팩터링 금지.**
+- **관련 없는 파일 수정 금지.**
+- **새 dependency 추가**는 사용자 확인 후에만 한다.
+- FFmpeg 설치/포함은 현재 ExGame 배포 구조(웹 ZIP / `auto-run.bat` / 동봉 assets)를 분석한 뒤, **유지보수하기 쉬운 방식**을 선택한다.
+
+## 기존 코드와의 경계
+
+- BGM/`BgmFileStore` 등 기존 오디오·세이브 코드를 Media Editor용으로 무리하게 개조하지 않는다. 필요 시 별도 모듈을 새로 둔다.
+- 게임플레이·월드·HUD 핵심 경로에 Media Editor 로직을 섞지 않는다.

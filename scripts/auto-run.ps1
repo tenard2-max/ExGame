@@ -12,47 +12,45 @@ $gameRoot = Join-Path $projectPath "build\web-desktop"
 $indexPath = Join-Path $gameRoot "index.html"
 
 if (-not (Test-Path -LiteralPath $indexPath)) {
-    # 배포 패키지(루트에 index.html)에서도 동작
+    # Package layout: index.html sits next to this script.
     if (Test-Path -LiteralPath (Join-Path $scriptDirectory "index.html")) {
         $gameRoot = $scriptDirectory
     } else {
-        throw "웹 빌드가 없습니다: $indexPath`n먼저 scripts\build-web.ps1 을 실행하세요."
+        throw "Web build missing: $indexPath. Run scripts\build-web.ps1 first."
     }
 }
 
 Write-Host "========================================"
-Write-Host " ExGame 자동 실행"
+Write-Host " ExGame auto-run"
 Write-Host "========================================"
 Write-Host ""
 
 if (-not $SkipSync) {
     $syncScript = Join-Path $scriptDirectory "sync-runtime-atlases.ps1"
     $devAssets = Join-Path (Split-Path -Parent $scriptDirectory) "assets\textures"
-    # 개발 트리에서만 동기화 (배포 패키지에는 소스 아틀라스가 없음)
     if ((Test-Path -LiteralPath $syncScript) -and (Test-Path -LiteralPath $devAssets)) {
-        Write-Host "[1/2] 런타임 아틀라스 동기화..."
+        Write-Host "[1/2] Syncing runtime atlases..."
         try {
             & $syncScript -OutputPath $gameRoot
         } catch {
-            Write-Host "[경고] 아틀라스 동기화 실패 — 서버는 계속 기동합니다: $_" -ForegroundColor Yellow
+            Write-Host "[WARN] Atlas sync failed - continuing: $_" -ForegroundColor Yellow
         }
     } else {
-        Write-Host "[1/2] 아틀라스 동기화 생략 (배포 패키지 또는 스크립트 없음)"
+        Write-Host "[1/2] Atlas sync skipped (package mode)"
     }
 } else {
-    Write-Host "[1/2] 아틀라스 동기화 생략 (-SkipSync)"
+    Write-Host "[1/2] Atlas sync skipped (-SkipSync)"
 }
 
-Write-Host "[2/2] 로컬 서버 기동 + 브라우저 열기..."
+Write-Host "[2/2] Starting local server + browser..."
 $startServer = Join-Path $scriptDirectory "start-server.ps1"
-# 배포 ZIP을 새로 풀어도 7456에 옛 서버가 남아 있으면 예전 UI가 그대로 보인다.
-# auto-run은 항상 포트를 비우고 현재 폴더 기준으로 서버를 다시 띄운다.
-$restart = $true
+# Always restart so an old :7456 server from a previous ZIP is not reused.
+$doRestart = $true
 if ($PSBoundParameters.ContainsKey('ForceRestart') -and -not $ForceRestart) {
-    $restart = $false
+    $doRestart = $false
 }
-$args = @{ Port = $Port }
-if ($restart) {
-    $args.ForceRestart = $true
+$serverArgs = @{ Port = $Port }
+if ($doRestart) {
+    $serverArgs.ForceRestart = $true
 }
-& $startServer @args
+& $startServer @serverArgs

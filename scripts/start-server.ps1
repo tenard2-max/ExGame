@@ -168,8 +168,7 @@ if ($portBusy) {
     return
 }
 
-# Media Editor Export API 가 포함된 로컬 서버를 기동합니다.
-# (fallback: 스크립트 없으면 python -m http.server)
+# Media Editor Export API server (fallback: python -m http.server)
 $localServerPyCandidates = @(
     (Join-Path $scriptDirectory "exgame-local-server.py"),
     (Join-Path (Split-Path -Parent $scriptDirectory) "scripts\exgame-local-server.py"),
@@ -186,13 +185,13 @@ if ($localServerPy) {
         "--bind", "127.0.0.1",
         "--directory", $gameRoot
     )
-    Write-Host "서버 스크립트: $localServerPy"
+    Write-Host "Server script: $localServerPy"
 } else {
-    Write-Host "경고: exgame-local-server.py 없음 — 정적 http.server 로 기동 (Export API 불가)"
+    Write-Host "WARN: exgame-local-server.py missing - using static http.server (no Export API)"
     $argList += @("-m", "http.server", "$Port", "--bind", "127.0.0.1", "--directory", $gameRoot)
 }
 
-Write-Host "서버 기동 중..."
+Write-Host "Starting server..."
 $server = Start-Process `
     -FilePath $pythonCmd.FilePath `
     -ArgumentList $argList `
@@ -204,17 +203,17 @@ if (-not (Wait-ForPort -ListenPort $Port -TimeoutMs 20000)) {
     if ($server -and -not $server.HasExited) {
         Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
     }
-    throw "포트 $Port 에서 서버가 기동되지 않았습니다. Python/방화벽/포트 충돌을 확인하세요."
+    throw "Server did not start on port $Port. Check Python/firewall/port conflict."
 }
 
-Write-Host "서버 준비 완료 (PID $($server.Id))"
+Write-Host "Server ready (PID $($server.Id))"
 if (-not $NoBrowser) {
     Open-GameInFullscreenBrowser $url
 }
 
 Write-Host ""
-Write-Host "플레이 중... 이 창을 닫으면 서버가 종료됩니다."
-Write-Host "종료: Ctrl+C 또는 창 닫기"
+Write-Host "Playing... Closing this window stops the server."
+Write-Host "Exit: Ctrl+C or close window"
 try {
     Wait-Process -Id $server.Id
 } finally {

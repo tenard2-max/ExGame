@@ -1239,3 +1239,13 @@ export function openMediaTimelineEditor(): void {
   if (editorSingleton.isOpen()) return;
   editorSingleton.open();
 }
+
+declare global {
+  interface Window {
+    exgameOpenMediaTimelineEditor?: () => void;
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.exgameOpenMediaTimelineEditor = openMediaTimelineEditor;
+}

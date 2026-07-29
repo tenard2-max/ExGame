@@ -1,5 +1,5 @@
 param(
-    [int]$Port = 7456,
+    [int]$Port = 7460,
     [switch]$ForceRestart,
     [switch]$SkipSync
 )

@@ -121,6 +121,52 @@ if ($indexAfter -notmatch 'exgame-boot-skin') {
     Write-Host "Injected early boot skin into index.html (style in head, hint in body)"
 }
 
+# Cache-proof MP4 entry button (does not depend on Cocos bundle being fresh)
+$indexFinal = Get-Content -LiteralPath $indexPath -Raw -Encoding UTF8
+if ($indexFinal -notmatch 'exgame-mp4-fab') {
+    $mp4Fab = @'
+<button id="exgame-mp4-fab" type="button" title="Media Timeline Editor">MP4</button>
+<style id="exgame-mp4-fab-style">
+#exgame-mp4-fab{
+  position:fixed!important; top:16px!important; right:230px!important;
+  z-index:2147483646!important; width:72px; height:48px;
+  border:2px solid #6ecf9a; border-radius:10px;
+  background:rgba(20,48,36,.96); color:#e8fff3;
+  font:700 16px/1 "Segoe UI",sans-serif; cursor:pointer;
+  box-shadow:0 4px 14px rgba(0,0,0,.4); pointer-events:auto!important;
+}
+#exgame-mp4-fab:hover{ border-color:#9dffc7; }
+@media (max-width:900px){
+  #exgame-mp4-fab{ right:12px!important; top:auto!important; bottom:16px!important; }
+}
+</style>
+<script id="exgame-mp4-fab-script">
+(function(){
+  function bind(){
+    var b=document.getElementById("exgame-mp4-fab");
+    if(!b||b.__exgameBound) return;
+    b.__exgameBound=true;
+    b.addEventListener("click", function(ev){
+      ev.preventDefault(); ev.stopPropagation();
+      if(typeof window.exgameOpenMediaTimelineEditor==="function"){
+        window.exgameOpenMediaTimelineEditor();
+      }else{
+        alert("Game is still loading. Click again after the world appears.");
+      }
+    });
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", bind);
+  else bind();
+  setInterval(bind, 1000);
+})();
+</script>
+'@
+    $indexWithFab = $indexFinal -replace '</body>', ($mp4Fab + "`r`n</body>")
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($indexPath, $indexWithFab, $utf8NoBom)
+    Write-Host "Injected cache-proof MP4 FAB into index.html"
+}
+
 & $syncScript -OutputPath $outputPath
 
 # Build output sometimes keeps stale 1280x720; force QHD to match runtime DESIGN_*.

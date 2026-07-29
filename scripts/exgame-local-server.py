@@ -361,9 +361,27 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            body = self.rfile.read(length)
-            fields, files = parse_multipart(body, self.headers.get("Content-Type", ""))
+            print(f"Export POST start bytes={length}")
+            # Stream upload to disk first — avoids giant in-RAM copies that can kill the connection.
+            with tempfile.NamedTemporaryFile(prefix="exme_body_", suffix=".bin", delete=False) as tmp_body:
+                body_path = Path(tmp_body.name)
+                remaining = length
+                while remaining > 0:
+                    chunk = self.rfile.read(min(1024 * 1024, remaining))
+                    if not chunk:
+                        break
+                    tmp_body.write(chunk)
+                    remaining -= len(chunk)
+            try:
+                body = body_path.read_bytes()
+                fields, files = parse_multipart(body, self.headers.get("Content-Type", ""))
+            finally:
+                try:
+                    body_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
             job = json.loads(fields.get("job", "{}"))
+            return_mode = str(job.get("returnMode") or "path").lower()
             ffmpeg = resolve_ffmpeg(self.server.ffmpeg_roots)  # type: ignore[attr-defined]
             if not ffmpeg:
                 raise FileNotFoundError(
@@ -377,16 +395,33 @@ class Handler(BaseHTTPRequestHandler):
                     dest = work / f"{safe_name(asset_id)}_{safe_name(filename)}"
                     dest.write_bytes(data)
                     file_map[asset_id] = dest
+                    print(f"Export asset {asset_id} -> {dest.name} ({len(data)} bytes)")
+                print(f"Export ffmpeg start clips=v{len(job.get('videoClips') or [])}/i{len(job.get('imageClips') or [])}")
                 out = build_export(job, file_map, work, ffmpeg)
-                payload = out.read_bytes()
-            # Keep a durable copy next to the game package so Edge --app
-            # silent-download failures still leave a file the user can find.
-            exports_dir = Path(self.server.game_root) / "exports"  # type: ignore[attr-defined]
-            exports_dir.mkdir(parents=True, exist_ok=True)
-            stamp = time.strftime("%Y%m%d-%H%M%S")
-            saved = exports_dir / f"exgame-export-{stamp}.mp4"
-            saved.write_bytes(payload)
-            print(f"Export saved: {saved}")
+                # Durable copy next to the game package (Edge --app download is unreliable).
+                exports_dir = Path(self.server.game_root) / "exports"  # type: ignore[attr-defined]
+                exports_dir.mkdir(parents=True, exist_ok=True)
+                stamp = time.strftime("%Y%m%d-%H%M%S")
+                saved = exports_dir / f"exgame-export-{stamp}.mp4"
+                shutil.copy2(out, saved)
+                size = saved.stat().st_size
+            print(f"Export saved: {saved} ({size} bytes)")
+            if return_mode != "blob":
+                payload = json.dumps(
+                    {"ok": True, "path": str(saved), "bytes": size},
+                    ensure_ascii=False,
+                ).encode("utf-8")
+                self.send_response(200)
+                self._cors()
+                self._no_cache()
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("X-ExGame-Export-Path", str(saved))
+                self.send_header("Access-Control-Expose-Headers", "X-ExGame-Export-Path")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+                return
+            payload = saved.read_bytes()
             self.send_response(200)
             self._cors()
             self._no_cache()
@@ -398,6 +433,8 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(payload)
         except Exception as exc:  # noqa: BLE001
+            print(f"Export ERROR: {exc}")
+            print(traceback.format_exc()[-2000:])
             payload = json.dumps(
                 {"ok": False, "error": str(exc), "trace": traceback.format_exc()[-2000:]},
                 ensure_ascii=False,

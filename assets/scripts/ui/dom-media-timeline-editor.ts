@@ -154,7 +154,7 @@ export class DomMediaTimelineEditor {
                 <div class="exme-lane-body" data-role="video-clips"></div>
               </div>
               <div class="exme-track-lane exme-track-image" data-role="image-lane" data-track-kind="image"
-                   title="IMAGE Track — PNG 드롭 (VIDEO 위 Overlay)">
+                   title="IMAGE Track — PNG 드롭 (VIDEO와 시간 겹침 없음)">
                 <span class="exme-track-tag">IMG</span>
                 <div class="exme-lane-body" data-role="image-clips"></div>
               </div>
@@ -536,16 +536,19 @@ export class DomMediaTimelineEditor {
       );
       const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const filename = `exgame-export-${stamp}.mp4`;
-      const picked = await saveBlobWithPicker(blob, filename);
-      if (!picked) {
-        downloadBlob(blob, filename);
+      let picked: string | null = null;
+      if (blob) {
+        picked = await saveBlobWithPicker(blob, filename);
+        if (!picked) {
+          downloadBlob(blob, filename);
+        }
       }
       const where = savedPath
-        ? `서버 저장: ${savedPath}`
+        ? `서버 저장:\n${savedPath}\n\n탐색기에서 이 파일을 여세요.`
         : picked
           ? `저장: ${picked}`
           : `브라우저 다운로드: ${filename} (다운로드 폴더 확인)`;
-      this.setStatus(`Export 완료 · ${where}`);
+      this.setStatus(`Export 완료 · ${savedPath || picked || filename}`);
       window.alert(`Export 완료\n\n${where}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Export 실패';

@@ -21,6 +21,11 @@ export interface MediaAssetRef {
   readonly objectUrl: string;
   /** 초 단위. 오디오/비디오 duration, 이미지는 0 */
   readonly durationSec: number;
+  /**
+   * 원본 File (Export용). object URL fetch는 Edge에서 Failed to fetch 가 나기 쉬워
+   * FormData에는 이 핸들을 우선 사용한다.
+   */
+  readonly file?: File;
 }
 
 export interface MediaTrack {

@@ -75,6 +75,7 @@ export class MediaTimelineProject {
       mimeType: file.type || 'audio/mpeg',
       objectUrl,
       durationSec,
+      file,
     };
     this.masterAudio = asset;
     this.assets.set(asset.id, asset);
@@ -101,6 +102,7 @@ export class MediaTimelineProject {
       mimeType: file.type || 'application/octet-stream',
       objectUrl,
       durationSec,
+      file,
     };
     this.assets.set(asset.id, asset);
     this.emit();

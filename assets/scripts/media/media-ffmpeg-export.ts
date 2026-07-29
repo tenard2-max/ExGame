@@ -5,6 +5,7 @@
 import {
   TRACK_KIND_IMAGE,
   TRACK_KIND_VIDEO,
+  type MediaAssetRef,
   type MediaTimelineSnapshot,
   type TimelineClip,
 } from './media-timeline-types';
@@ -36,10 +37,30 @@ function clipPayload(clip: TimelineClip) {
   };
 }
 
-async function blobFromObjectUrl(objectUrl: string): Promise<Blob> {
-  const response = await fetch(objectUrl);
-  if (!response.ok) throw new Error('미디어 blob을 읽지 못했습니다.');
-  return response.blob();
+/**
+ * Export용 Blob. File 핸들을 우선 쓰고, 없을 때만 object URL을 읽는다.
+ * (blob: URL fetch는 Edge에서 Failed to fetch 로 실패하는 경우가 있다)
+ */
+async function mediaBlob(asset: MediaAssetRef): Promise<Blob> {
+  if (asset.file && asset.file.size > 0) {
+    return asset.file;
+  }
+  try {
+    const response = await fetch(asset.objectUrl);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const blob = await response.blob();
+    if (!blob || blob.size < 1) {
+      throw new Error('empty blob');
+    }
+    return blob;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `미디어를 읽을 수 없습니다: ${asset.name} (${detail}). 파일을 다시 드롭한 뒤 Export 하세요.`,
+    );
+  }
 }
 
 export async function fetchExportStatus(): Promise<MediaExportStatus> {
@@ -59,14 +80,33 @@ export async function fetchExportStatus(): Promise<MediaExportStatus> {
   }
 }
 
+function mapFetchError(error: unknown, timeoutMs: number): Error {
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return new Error(
+      `Export 시간 초과 (${Math.round(timeoutMs / 1000)}초). 해상도/길이를 줄이거나 서버 창의 ffmpeg 로그를 확인하세요.`,
+    );
+  }
+  const raw = error instanceof Error ? error.message : String(error);
+  if (/failed to fetch/i.test(raw) || /networkerror/i.test(raw)) {
+    return new Error(
+      '서버 연결이 끊겼습니다 (Failed to fetch).\n' +
+        '1) auto-run 서버 창이 열려 있는지 확인\n' +
+        '2) 미디어를 다시 드롭한 뒤 Export\n' +
+        '3) 서버 창에 ffmpeg 오류가 있으면 알려 주세요',
+    );
+  }
+  return error instanceof Error ? error : new Error(raw);
+}
+
 /**
- * 타임라인 스냅샷을 multipart로 보내 최종 MP4 Blob을 받습니다.
+ * 타임라인 스냅샷을 multipart로 보내 최종 MP4를 만든다.
+ * 서버가 exports/ 에 저장한 경로를 우선 반환한다 (대용량 응답 전송 회피).
  */
 export async function exportTimelineMp4(
   snapshot: MediaTimelineSnapshot,
   options: MediaExportOptions,
   onProgress?: (message: string) => void,
-): Promise<{ blob: Blob; savedPath: string | null }> {
+): Promise<{ blob: Blob | null; savedPath: string | null }> {
   if (!snapshot.masterAudio || snapshot.masterDurationSec <= 0) {
     throw new Error('먼저 MP3(Master Timeline)를 로드하세요.');
   }
@@ -83,6 +123,8 @@ export async function exportTimelineMp4(
     audioAssetId: snapshot.masterAudio.id,
     videoClips: videoClips.map(clipPayload),
     imageClips: imageClips.map(clipPayload),
+    // 서버가 exports에 저장 후 JSON 경로만 응답 (대용량 본문 전송 생략)
+    returnMode: 'path',
     qualityNote: 'PNG 기준(알파 유지 시도), PNG 없으면 MP4 기준',
   };
 
@@ -90,7 +132,7 @@ export async function exportTimelineMp4(
   const form = new FormData();
   form.append('job', JSON.stringify(job));
 
-  const audioBlob = await blobFromObjectUrl(snapshot.masterAudio.objectUrl);
+  const audioBlob = await mediaBlob(snapshot.masterAudio);
   form.append(
     `file_${snapshot.masterAudio.id}`,
     audioBlob,
@@ -102,13 +144,13 @@ export async function exportTimelineMp4(
   for (const assetId of needed) {
     const asset = snapshot.assets.find((entry) => entry.id === assetId);
     if (!asset) throw new Error(`에셋 없음: ${assetId}`);
-    const blob = await blobFromObjectUrl(asset.objectUrl);
+    const blob = await mediaBlob(asset);
     form.append(`file_${asset.id}`, blob, asset.name || asset.id);
   }
 
   onProgress?.('로컬 ffmpeg Export 중… (길면 수 분 걸릴 수 있음)');
   const controller = new AbortController();
-  const timeoutMs = Math.max(120_000, Math.ceil(snapshot.masterDurationSec) * 4000);
+  const timeoutMs = Math.max(180_000, Math.ceil(snapshot.masterDurationSec) * 6000);
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   let response: Response;
   try {
@@ -118,10 +160,7 @@ export async function exportTimelineMp4(
       signal: controller.signal,
     });
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error(`Export 시간 초과 (${Math.round(timeoutMs / 1000)}초). 타임라인이 길면 해상도/길이를 줄여 보세요.`);
-    }
-    throw error;
+    throw mapFetchError(error, timeoutMs);
   } finally {
     window.clearTimeout(timer);
   }
@@ -129,7 +168,7 @@ export async function exportTimelineMp4(
   if (!response.ok) {
     let detail = `Export 실패 (${response.status})`;
     try {
-      const err = (await response.json()) as { error?: string };
+      const err = (await response.json()) as { error?: string; trace?: string };
       if (err.error) detail = err.error;
     } catch {
       /* ignore */
@@ -139,9 +178,17 @@ export async function exportTimelineMp4(
 
   const contentType = response.headers.get('Content-Type') || '';
   if (contentType.includes('application/json')) {
-    const err = (await response.json()) as { error?: string };
-    throw new Error(err.error || 'Export 실패');
+    const data = (await response.json()) as {
+      ok?: boolean;
+      error?: string;
+      path?: string;
+      bytes?: number;
+    };
+    if (data.error) throw new Error(data.error);
+    if (!data.path) throw new Error('Export 경로가 비어 있습니다.');
+    return { blob: null, savedPath: data.path };
   }
+
   const savedPath = response.headers.get('X-ExGame-Export-Path');
   const blob = await response.blob();
   if (!blob || blob.size < 32) {

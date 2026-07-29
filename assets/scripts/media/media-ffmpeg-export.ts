@@ -11,12 +11,14 @@ import {
   type TimelineClip,
 } from './media-timeline-types';
 
-export type ExportResolution = '1280x720' | '1920x1080';
+export type ExportResolution = '1280x720' | '1920x1080' | '720x1280';
 export type ExportFps = 30 | 60;
 
 export interface MediaExportOptions {
   resolution: ExportResolution;
   fps: ExportFps;
+  /** MP4 전역 재생 속도 (0.2 ~ 1.0). PNG/오디오에는 영향 없음 */
+  videoSpeed: number;
 }
 
 export interface MediaExportStatus {
@@ -170,6 +172,7 @@ export async function exportTimelineMp4(
   const job = {
     resolution: options.resolution,
     fps: options.fps,
+    videoSpeed: Math.max(0.2, Math.min(1, Number(options.videoSpeed) || 1)),
     masterDurationSec: snapshot.masterDurationSec,
     audioAssetId: snapshot.masterAudio.id,
     videoClips: videoClips.map(clipPayload),

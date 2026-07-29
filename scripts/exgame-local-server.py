@@ -139,15 +139,35 @@ def parse_multipart_to_disk(
     return fields, files
 
 
-def clip_scale_pad(input_idx: int, label: str, clip: dict, width: int, height: int, dur: float) -> str:
+def clip_scale_pad(
+    input_idx: int,
+    label: str,
+    clip: dict,
+    width: int,
+    height: int,
+    dur: float,
+    *,
+    is_image: bool,
+    video_speed: float,
+    fps: int,
+) -> str:
     scale = float(clip.get("scale", 1) or 1)
     opacity = max(0.0, min(1.0, float(clip.get("opacity", 1) or 1)))
     fade_in = float(clip.get("fadeInSec", 0) or 0)
     fade_out = float(clip.get("fadeOutSec", 0) or 0)
+    speed = max(0.2, min(1.0, float(video_speed or 1.0)))
+    # Timeline length stays `dur`. Slow MP4 (speed<1) consumes dur*speed of source, then stretches.
+    if is_image or abs(speed - 1.0) < 1e-6:
+        trim_dur = dur
+        setpts = "setpts=PTS-STARTPTS"
+    else:
+        trim_dur = max(0.05, dur * speed)
+        setpts = f"setpts=(PTS-STARTPTS)/{speed:.6f}"
     parts = [
         f"[{input_idx}:v]",
-        f"trim=duration={dur:.6f}",
-        "setpts=PTS-STARTPTS",
+        f"trim=duration={trim_dur:.6f}",
+        setpts,
+        f"fps={int(fps)}",
         f"scale=iw*{scale}:ih*{scale}",
         f"scale={width}:{height}:force_original_aspect_ratio=decrease",
         f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black",
@@ -193,6 +213,8 @@ def build_export(
     crf = "20" if has_png else "22"
     preset = "ultrafast"  # UI responsiveness / disk temperature first
 
+    video_speed = max(0.2, min(1.0, float(job.get("videoSpeed", 1) or 1)))
+
     # Build non-overlapping coverage [0, master]
     segments: list[tuple] = []
     cursor = 0.0
@@ -220,7 +242,7 @@ def build_export(
     cmd: list[str] = [str(ffmpeg), "-y", "-hide_banner", "-loglevel", "error", "-progress", "pipe:1"]
     cmd += ["-i", str(file_map[audio_id])]  # 0: audio
 
-    input_meta: list[tuple[int, str, dict | None, float]] = []
+    input_meta: list[tuple[int, str, dict | None, float, bool]] = []
     next_idx = 1
     for seg in segments:
         if seg[0] == "black":
@@ -231,7 +253,7 @@ def build_export(
                 "-i",
                 f"color=c=black:s={width}x{height}:d={dur:.6f}:r={fps}",
             ]
-            input_meta.append((next_idx, "black", None, dur))
+            input_meta.append((next_idx, "black", None, dur, False))
             next_idx += 1
         else:
             _, clip, is_image, dur = seg
@@ -241,21 +263,34 @@ def build_export(
             if is_image:
                 cmd += ["-loop", "1", "-t", f"{dur:.6f}", "-i", str(src)]
             else:
+                src_need = max(0.05, dur * video_speed)
                 if bool(clip.get("loop", False)):
                     cmd += ["-stream_loop", "-1"]
-                cmd += ["-t", f"{dur:.6f}", "-i", str(src)]
-            input_meta.append((next_idx, "clip", clip, dur))
+                cmd += ["-t", f"{src_need:.6f}", "-i", str(src)]
+            input_meta.append((next_idx, "clip", clip, dur, is_image))
             next_idx += 1
 
     filters: list[str] = []
     labels: list[str] = []
-    for i, (in_idx, kind, clip, dur) in enumerate(input_meta):
+    for i, (in_idx, kind, clip, dur, is_image) in enumerate(input_meta):
         lab = f"s{i}"
         if kind == "black":
             filters.append(f"[{in_idx}:v]format=yuv420p,setsar=1[{lab}]")
         else:
             assert clip is not None
-            filters.append(clip_scale_pad(in_idx, lab, clip, width, height, dur))
+            filters.append(
+                clip_scale_pad(
+                    in_idx,
+                    lab,
+                    clip,
+                    width,
+                    height,
+                    dur,
+                    is_image=is_image,
+                    video_speed=video_speed,
+                    fps=fps,
+                )
+            )
         labels.append(lab)
 
     concat_in = "".join(f"[{lab}]" for lab in labels)

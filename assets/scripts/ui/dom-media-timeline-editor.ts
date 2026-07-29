@@ -55,6 +55,8 @@ export class DomMediaTimelineEditor {
   private zoom = 1;
   private exportResolution: ExportResolution = '1280x720';
   private exportFps: ExportFps = 30;
+  /** 전역 MP4 속도 (0.2~1.0). Preview + Export에 적용 */
+  private exportVideoSpeed = 1;
   private exporting = false;
   private exportOverlay: HTMLElement | null = null;
   private exportProgressBar: HTMLElement | null = null;
@@ -176,8 +178,9 @@ export class DomMediaTimelineEditor {
             <div class="exme-export-opts">
               <label>해상도
                 <select data-role="export-res">
-                  <option value="1280x720" selected>1280×720 (빠름)</option>
-                  <option value="1920x1080">1920×1080</option>
+                  <option value="1280x720" selected>1280×720 (가로)</option>
+                  <option value="1920x1080">1920×1080 (가로)</option>
+                  <option value="720x1280">720×1280 (세로)</option>
                 </select>
               </label>
               <label>FPS
@@ -186,7 +189,13 @@ export class DomMediaTimelineEditor {
                   <option value="60">60</option>
                 </select>
               </label>
-              <p class="exme-quality-hint">Quality: PNG 있으면 고화질(CRF17), 없으면 MP4(CRF20)</p>
+              <label class="exme-speed-label">MP4 속도
+                <span class="exme-speed-row">
+                  <input type="range" min="0.2" max="1" step="0.05" value="1" data-role="export-speed" />
+                  <span data-role="export-speed-value">1.00x</span>
+                </span>
+              </label>
+              <p class="exme-quality-hint">속도 0.2~1.0 (느림↔보통). PNG/BGM에는 영향 없음</p>
             </div>
             <button type="button" data-action="export">MP4 Export</button>
             <p class="exme-folder" data-role="folder-label">폴더: (없음)</p>
@@ -346,12 +355,26 @@ export class DomMediaTimelineEditor {
 
     const resSelect = root.querySelector('[data-role="export-res"]') as HTMLSelectElement | null;
     const fpsSelect = root.querySelector('[data-role="export-fps"]') as HTMLSelectElement | null;
+    const speedInput = root.querySelector('[data-role="export-speed"]') as HTMLInputElement | null;
+    const speedValue = root.querySelector('[data-role="export-speed-value"]');
     resSelect?.addEventListener('change', () => {
       this.exportResolution = resSelect.value as ExportResolution;
     });
     fpsSelect?.addEventListener('change', () => {
       this.exportFps = Number(fpsSelect.value) as ExportFps;
     });
+    const syncSpeedUi = (announce: boolean): void => {
+      if (!speedInput) return;
+      const speed = Math.max(0.2, Math.min(1, Number(speedInput.value) || 1));
+      this.exportVideoSpeed = speed;
+      if (speedValue) speedValue.textContent = `${speed.toFixed(2)}x`;
+      this.previewVideo.playbackRate = speed;
+      if (announce) {
+        this.setStatus(`MP4 속도 ${speed.toFixed(2)}x (타임라인 길이는 유지, 영상만 느리게)`);
+      }
+    };
+    speedInput?.addEventListener('input', () => syncSpeedUi(true));
+    syncSpeedUi(false);
 
     void fetchExportStatus().then((status) => {
       if (!status.ready) {
@@ -560,7 +583,7 @@ export class DomMediaTimelineEditor {
         );
       }
       this.setExportProgress(
-        `업로드/인코딩 준비 (${this.exportResolution} @ ${this.exportFps})`,
+        `업로드/인코딩 준비 (${this.exportResolution} @ ${this.exportFps}, speed ${this.exportVideoSpeed.toFixed(2)}x)`,
         4,
       );
       const { blob, savedPath } = await exportTimelineMp4(
@@ -568,6 +591,7 @@ export class DomMediaTimelineEditor {
         {
           resolution: this.exportResolution,
           fps: this.exportFps,
+          videoSpeed: this.exportVideoSpeed,
         },
         (message, progress) => this.setExportProgress(message, progress ?? 0),
       );
@@ -719,9 +743,12 @@ export class DomMediaTimelineEditor {
     this.previewVideo.style.visibility = 'visible';
     this.previewVideo.style.opacity = String(clip.opacity);
     this.previewVideo.style.transform = `scale(${clip.scale})`;
+    this.previewVideo.playbackRate = this.exportVideoSpeed;
     const local = timeSec - clip.startSec;
     const srcDur = Math.max(0.001, asset.durationSec || 0.001);
-    const mediaTime = clip.loop ? local % srcDur : Math.min(local, srcDur);
+    const speed = Math.max(0.2, Math.min(1, this.exportVideoSpeed));
+    const mediaTimeRaw = local * speed;
+    const mediaTime = clip.loop ? mediaTimeRaw % srcDur : Math.min(mediaTimeRaw, srcDur);
     if (Math.abs(this.previewVideo.currentTime - mediaTime) > 0.12) {
       try {
         this.previewVideo.currentTime = mediaTime;
@@ -1248,6 +1275,14 @@ export class DomMediaTimelineEditor {
 #${ROOT_ID} .exme-export-opts select {
   height: 32px; border-radius: 6px; border: 1px solid #3a465c;
   background: #1c2634; color: #ebf5ff;
+}
+#${ROOT_ID} .exme-speed-row {
+  display: flex; align-items: center; gap: 10px;
+}
+#${ROOT_ID} .exme-speed-row input[type="range"] { flex: 1; }
+#${ROOT_ID} .exme-speed-row span {
+  min-width: 48px; text-align: right; font-variant-numeric: tabular-nums;
+  color: #d7e6f8; font-weight: 700;
 }
 #${ROOT_ID} .exme-quality-hint { font-size: 11px; color: #6f8098; margin: 0; }
 #${ROOT_ID} .exme-inspector {

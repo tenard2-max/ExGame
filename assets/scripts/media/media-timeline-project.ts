@@ -1,13 +1,15 @@
 /**
  * Media Timeline Editor 프로젝트 상태.
  * Master Timeline 길이는 로드된 MP3 duration 과 동일합니다.
+ * MP4/PNG는 공유 시퀀스로 배치되어 같은 시간에 겹치지 않습니다.
  */
 import {
   applyAdjacentFades,
   createDefaultTracks,
+  listVisualClips,
   packSequential,
-  rebalanceTrackEqual,
-  resizeClipOnTrack,
+  rebalanceVisualEqual,
+  resizeVisualClip,
   trackIdForAssetKind,
 } from './media-timeline-layout';
 import {
@@ -61,7 +63,6 @@ export class MediaTimelineProject {
     return this.clips.find((clip) => clip.id === clipId);
   }
 
-  /** MP3를 Master Audio 로 설정. 이전 마스터 URL 은 revoke. */
   setMasterAudio(file: File, durationSec: number, objectUrl: string): MediaAssetRef {
     if (this.masterAudio) {
       URL.revokeObjectURL(this.masterAudio.objectUrl);
@@ -77,7 +78,7 @@ export class MediaTimelineProject {
     };
     this.masterAudio = asset;
     this.assets.set(asset.id, asset);
-    this.rebalanceAllVisualTracks();
+    this.rebalanceAllVisual();
     this.emit();
     return asset;
   }
@@ -112,7 +113,10 @@ export class MediaTimelineProject {
     );
   }
 
-  /** 라이브러리 에셋을 VIDEO/IMAGE 트랙에 추가 후 해당 트랙 균등 재배치. */
+  /**
+   * VIDEO/IMAGE 클립 추가 후 MP4+PNG 전체를 균등 재배치.
+   * 같은 시간대에 MP4와 PNG가 겹치지 않는다.
+   */
   addClipFromAsset(assetId: string): TimelineClip | null {
     const asset = this.assets.get(assetId);
     if (!asset || (asset.kind !== 'video' && asset.kind !== 'image')) return null;
@@ -135,7 +139,7 @@ export class MediaTimelineProject {
       fadeOutSec: 0,
     };
     this.clips.push(clip);
-    rebalanceTrackEqual(this.clips, trackId, master, this.assets);
+    this.rebalanceAllVisual();
     this.selectedClipId = clip.id;
     this.emit();
     return clip;
@@ -149,13 +153,9 @@ export class MediaTimelineProject {
   removeClip(clipId: string): boolean {
     const index = this.clips.findIndex((clip) => clip.id === clipId);
     if (index < 0) return false;
-    const trackId = this.clips[index].trackId;
     this.clips.splice(index, 1);
     if (this.selectedClipId === clipId) this.selectedClipId = null;
-    const master = this.masterAudio?.durationSec ?? 0;
-    if (master > 0) {
-      rebalanceTrackEqual(this.clips, trackId, master, this.assets);
-    }
+    this.rebalanceAllVisual();
     this.emit();
     return true;
   }
@@ -172,19 +172,17 @@ export class MediaTimelineProject {
     };
     const insertAt = this.clips.findIndex((clip) => clip.id === clipId) + 1;
     this.clips.splice(insertAt, 0, copy);
-    rebalanceTrackEqual(this.clips, source.trackId, master, this.assets);
+    this.rebalanceAllVisual();
     this.selectedClipId = copy.id;
     this.emit();
     return copy;
   }
 
   resizeClip(clipId: string, newDurationSec: number): boolean {
-    const clip = this.clips.find((entry) => entry.id === clipId);
-    if (!clip) return false;
     const master = this.masterAudio?.durationSec ?? 0;
-    const ok = resizeClipOnTrack(
+    const ok = resizeVisualClip(
       this.clips,
-      clip.trackId,
+      this.tracks,
       clipId,
       newDurationSec,
       master,
@@ -211,45 +209,39 @@ export class MediaTimelineProject {
   }
 
   /**
-   * 같은 트랙 내 순서만 변경. duration은 유지하고 순차 pack(균등 재배치하지 않음).
-   * toIndex: 이동 후 트랙 내 목표 인덱스(0-based).
+   * MP4+PNG 공유 시퀀스에서 순서 변경. duration 유지 후 순차 pack.
    */
   reorderClip(clipId: string, toIndex: number): boolean {
-    const trackId = this.clips.find((entry) => entry.id === clipId)?.trackId;
-    if (!trackId) return false;
-
-    const trackIndices: number[] = [];
-    for (let i = 0; i < this.clips.length; i += 1) {
-      if (this.clips[i].trackId === trackId) trackIndices.push(i);
-    }
-    const fromTrackPos = trackIndices.findIndex(
-      (globalIndex) => this.clips[globalIndex].id === clipId,
-    );
-    if (fromTrackPos < 0) return false;
-    const bounded = Math.max(0, Math.min(toIndex, trackIndices.length - 1));
-    if (fromTrackPos === bounded) {
+    const visual = listVisualClips(this.clips, this.tracks);
+    const fromPos = visual.findIndex((clip) => clip.id === clipId);
+    if (fromPos < 0) return false;
+    const bounded = Math.max(0, Math.min(toIndex, visual.length - 1));
+    if (fromPos === bounded) {
       this.selectedClipId = clipId;
       this.emit();
       return false;
     }
 
-    const globalFrom = trackIndices[fromTrackPos];
-    const [clip] = this.clips.splice(globalFrom, 1);
-    // splice 후 트랙 인덱스 재계산
-    const afterIndices: number[] = [];
+    const visualIds = new Set(visual.map((clip) => clip.id));
+    const globalFrom = this.clips.findIndex((clip) => clip.id === clipId);
+    const [moved] = this.clips.splice(globalFrom, 1);
+
+    const remainingVisualGlobals: number[] = [];
     for (let i = 0; i < this.clips.length; i += 1) {
-      if (this.clips[i].trackId === trackId) afterIndices.push(i);
+      if (visualIds.has(this.clips[i].id)) {
+        remainingVisualGlobals.push(i);
+      }
     }
     const insertGlobal =
-      bounded >= afterIndices.length
+      bounded >= remainingVisualGlobals.length
         ? this.clips.length
-        : afterIndices[bounded];
-    this.clips.splice(insertGlobal, 0, clip);
+        : remainingVisualGlobals[bounded];
+    this.clips.splice(insertGlobal, 0, moved);
 
-    const trackClips = this.clips.filter((entry) => entry.trackId === trackId);
-    packSequential(trackClips);
-    applyAdjacentFades(trackClips);
-    this.selectedClipId = clip.id;
+    const ordered = listVisualClips(this.clips, this.tracks);
+    packSequential(ordered);
+    applyAdjacentFades(ordered);
+    this.selectedClipId = moved.id;
     this.emit();
     return true;
   }
@@ -277,14 +269,10 @@ export class MediaTimelineProject {
     this.emit();
   }
 
-  private rebalanceAllVisualTracks(): void {
+  private rebalanceAllVisual(): void {
     const master = this.masterAudio?.durationSec ?? 0;
     if (master <= 0) return;
-    for (const track of this.tracks) {
-      if (track.kind === 'video' || track.kind === 'image') {
-        rebalanceTrackEqual(this.clips, track.id, master, this.assets);
-      }
-    }
+    rebalanceVisualEqual(this.clips, this.tracks, master, this.assets);
   }
 
   private emit(): void {
@@ -295,7 +283,6 @@ export class MediaTimelineProject {
   }
 }
 
-/** File → HTMLMediaElement 로 duration(초) 측정. */
 export function probeMediaDuration(objectUrl: string, isVideo: boolean): Promise<number> {
   return new Promise((resolve, reject) => {
     const el = document.createElement(isVideo ? 'video' : 'audio');

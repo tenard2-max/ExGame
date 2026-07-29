@@ -10,7 +10,7 @@ import {
   type ExportFps,
   type ExportResolution,
 } from '../media/media-ffmpeg-export';
-import { findClipAtTime } from '../media/media-timeline-layout';
+import { findClipAtTime, listVisualClips } from '../media/media-timeline-layout';
 import {
   MediaTimelineProject,
   probeMediaDuration,
@@ -505,7 +505,7 @@ export class DomMediaTimelineEditor {
       return;
     }
     const asset = this.project.getAsset(assetId);
-    this.setStatus(`배치: ${asset?.name ?? clip.id} · 트랙 균등 재배치`);
+    this.setStatus(`배치: ${asset?.name ?? clip.id} · MP4/PNG 균등(시간 겹침 없음)`);
   }
 
   private async runExport(): Promise<void> {
@@ -788,7 +788,7 @@ export class DomMediaTimelineEditor {
 
     if (master <= 0) {
       this.videoLane.appendChild(this.makeLaneHint('MP3 로드 후 MP4를 드롭하세요'));
-      this.imageLane.appendChild(this.makeLaneHint('PNG/JPG를 드롭하면 Overlay됩니다'));
+      this.imageLane.appendChild(this.makeLaneHint('이미지 트랙 — PNG (VIDEO와 시간 겹침 없음)'));
       return;
     }
 
@@ -803,7 +803,7 @@ export class DomMediaTimelineEditor {
       }
     }
     if (imageClips.length === 0) {
-      this.imageLane.appendChild(this.makeLaneHint('이미지 트랙 — PNG Drag & Drop'));
+      this.imageLane.appendChild(this.makeLaneHint('이미지 트랙 — PNG (VIDEO와 시간 겹침 없음)'));
     } else {
       for (const clip of imageClips) {
         this.imageLane.appendChild(this.buildClipEl(clip, snapshot, master));
@@ -913,14 +913,14 @@ export class DomMediaTimelineEditor {
     if (rect.width <= 0) return;
     const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
     const snap = this.project.getSnapshot();
-    const trackClips = snap.clips.filter((clip) => clip.trackId === session.trackId);
-    if (trackClips.length <= 1) return;
+    const visualClips = listVisualClips(snap.clips, snap.tracks);
+    if (visualClips.length <= 1) return;
     const toIndex = Math.min(
-      trackClips.length - 1,
-      Math.max(0, Math.floor(ratio * trackClips.length)),
+      visualClips.length - 1,
+      Math.max(0, Math.floor(ratio * visualClips.length)),
     );
     if (this.project.reorderClip(session.clipId, toIndex)) {
-      this.setStatus('클립 순서를 변경했습니다.');
+      this.setStatus('클립 순서를 변경했습니다. (MP4/PNG 시간 겹침 없음)');
     }
   };
 

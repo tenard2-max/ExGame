@@ -6,6 +6,7 @@ import {
   downloadBlob,
   exportTimelineMp4,
   fetchExportStatus,
+  saveBlobWithPicker,
   type ExportFps,
   type ExportResolution,
 } from '../media/media-ffmpeg-export';
@@ -512,10 +513,11 @@ export class DomMediaTimelineEditor {
     const snap = this.project.getSnapshot();
     if (!snap.masterAudio) {
       this.setStatus('Export: 먼저 MP3를 로드하세요.');
+      window.alert('Export: 먼저 MP3를 로드하세요.');
       return;
     }
     this.exporting = true;
-    this.setStatus('Export 중… (ffmpeg 로컬 서버)');
+    this.setStatus('Export 시작…');
     try {
       const status = await fetchExportStatus();
       if (!status.ready) {
@@ -523,15 +525,32 @@ export class DomMediaTimelineEditor {
           'ffmpeg.exe 없음. game/scripts/fetch-ffmpeg.ps1 실행 후 auto-run.bat 으로 다시 실행하세요.',
         );
       }
-      const blob = await exportTimelineMp4(snap, {
-        resolution: this.exportResolution,
-        fps: this.exportFps,
-      });
+      this.setStatus(`ffmpeg 준비됨 · Export 중… (${this.exportResolution} @ ${this.exportFps})`);
+      const { blob, savedPath } = await exportTimelineMp4(
+        snap,
+        {
+          resolution: this.exportResolution,
+          fps: this.exportFps,
+        },
+        (message) => this.setStatus(message),
+      );
       const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      downloadBlob(blob, `exgame-export-${stamp}.mp4`);
-      this.setStatus(`Export 완료 · ${this.exportResolution} @ ${this.exportFps}fps`);
+      const filename = `exgame-export-${stamp}.mp4`;
+      const picked = await saveBlobWithPicker(blob, filename);
+      if (!picked) {
+        downloadBlob(blob, filename);
+      }
+      const where = savedPath
+        ? `서버 저장: ${savedPath}`
+        : picked
+          ? `저장: ${picked}`
+          : `브라우저 다운로드: ${filename} (다운로드 폴더 확인)`;
+      this.setStatus(`Export 완료 · ${where}`);
+      window.alert(`Export 완료\n\n${where}`);
     } catch (error) {
-      this.setStatus(error instanceof Error ? error.message : 'Export 실패');
+      const message = error instanceof Error ? error.message : 'Export 실패';
+      this.setStatus(message);
+      window.alert(`Export 실패\n\n${message}`);
     } finally {
       this.exporting = false;
     }

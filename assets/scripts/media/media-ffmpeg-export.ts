@@ -65,7 +65,8 @@ export async function fetchExportStatus(): Promise<MediaExportStatus> {
 export async function exportTimelineMp4(
   snapshot: MediaTimelineSnapshot,
   options: MediaExportOptions,
-): Promise<Blob> {
+  onProgress?: (message: string) => void,
+): Promise<{ blob: Blob; savedPath: string | null }> {
   if (!snapshot.masterAudio || snapshot.masterDurationSec <= 0) {
     throw new Error('먼저 MP3(Master Timeline)를 로드하세요.');
   }
@@ -85,6 +86,7 @@ export async function exportTimelineMp4(
     qualityNote: 'PNG 기준(알파 유지 시도), PNG 없으면 MP4 기준',
   };
 
+  onProgress?.('미디어 준비 중…');
   const form = new FormData();
   form.append('job', JSON.stringify(job));
 
@@ -104,10 +106,25 @@ export async function exportTimelineMp4(
     form.append(`file_${asset.id}`, blob, asset.name || asset.id);
   }
 
-  const response = await fetch('/api/media-export', {
-    method: 'POST',
-    body: form,
-  });
+  onProgress?.('로컬 ffmpeg Export 중… (길면 수 분 걸릴 수 있음)');
+  const controller = new AbortController();
+  const timeoutMs = Math.max(120_000, Math.ceil(snapshot.masterDurationSec) * 4000);
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response;
+  try {
+    response = await fetch('/api/media-export', {
+      method: 'POST',
+      body: form,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error(`Export 시간 초과 (${Math.round(timeoutMs / 1000)}초). 타임라인이 길면 해상도/길이를 줄여 보세요.`);
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
 
   if (!response.ok) {
     let detail = `Export 실패 (${response.status})`;
@@ -125,7 +142,12 @@ export async function exportTimelineMp4(
     const err = (await response.json()) as { error?: string };
     throw new Error(err.error || 'Export 실패');
   }
-  return response.blob();
+  const savedPath = response.headers.get('X-ExGame-Export-Path');
+  const blob = await response.blob();
+  if (!blob || blob.size < 32) {
+    throw new Error('Export 결과가 비어 있습니다. (ffmpeg 실패 가능)');
+  }
+  return { blob, savedPath };
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {
@@ -133,6 +155,43 @@ export function downloadBlob(blob: Blob, filename: string): void {
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = filename;
+  anchor.style.display = 'none';
+  document.body.appendChild(anchor);
   anchor.click();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => {
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }, 2000);
+}
+
+/** File System Access API 가 있으면 저장 위치를 사용자가 고르게 합니다. */
+export async function saveBlobWithPicker(blob: Blob, filename: string): Promise<string | null> {
+  const w = window as Window & {
+    showSaveFilePicker?: (options: unknown) => Promise<{
+      createWritable: () => Promise<{ write: (data: Blob) => Promise<void>; close: () => Promise<void> }>;
+      name: string;
+    }>;
+  };
+  if (typeof w.showSaveFilePicker !== 'function') return null;
+  try {
+    const handle = await w.showSaveFilePicker({
+      suggestedName: filename,
+      types: [
+        {
+          description: 'MP4 Video',
+          accept: { 'video/mp4': ['.mp4'] },
+        },
+      ],
+    });
+    const writable = await handle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return handle.name || filename;
+  } catch (error) {
+    // user cancel
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return null;
+    }
+    throw error;
+  }
 }

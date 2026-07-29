@@ -14,6 +14,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 import traceback
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -378,11 +379,21 @@ class Handler(BaseHTTPRequestHandler):
                     file_map[asset_id] = dest
                 out = build_export(job, file_map, work, ffmpeg)
                 payload = out.read_bytes()
+            # Keep a durable copy next to the game package so Edge --app
+            # silent-download failures still leave a file the user can find.
+            exports_dir = Path(self.server.game_root) / "exports"  # type: ignore[attr-defined]
+            exports_dir.mkdir(parents=True, exist_ok=True)
+            stamp = time.strftime("%Y%m%d-%H%M%S")
+            saved = exports_dir / f"exgame-export-{stamp}.mp4"
+            saved.write_bytes(payload)
+            print(f"Export saved: {saved}")
             self.send_response(200)
             self._cors()
             self._no_cache()
             self.send_header("Content-Type", "video/mp4")
             self.send_header("Content-Disposition", 'attachment; filename="exgame-export.mp4"')
+            self.send_header("X-ExGame-Export-Path", str(saved))
+            self.send_header("Access-Control-Expose-Headers", "X-ExGame-Export-Path, Content-Disposition")
             self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
             self.wfile.write(payload)

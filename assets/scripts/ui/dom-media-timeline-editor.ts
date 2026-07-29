@@ -53,15 +53,22 @@ export class DomMediaTimelineEditor {
   private resizeSession: ResizeSession | null = null;
   private moveSession: MoveSession | null = null;
   private zoom = 1;
-  private exportResolution: ExportResolution = '1920x1080';
+  private exportResolution: ExportResolution = '1280x720';
   private exportFps: ExportFps = 30;
   private exporting = false;
+  private exportOverlay: HTMLElement | null = null;
+  private exportProgressBar: HTMLElement | null = null;
+  private exportProgressText: HTMLElement | null = null;
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     if (!this.root) return;
     if (event.key === 'Escape' || event.code === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
+      if (this.exporting) {
+        this.setStatus('Export 진행 중에는 닫을 수 없습니다. 완료를 기다려 주세요.');
+        return;
+      }
       this.close();
       return;
     }
@@ -169,8 +176,8 @@ export class DomMediaTimelineEditor {
             <div class="exme-export-opts">
               <label>해상도
                 <select data-role="export-res">
-                  <option value="1280x720">1280×720</option>
-                  <option value="1920x1080" selected>1920×1080</option>
+                  <option value="1280x720" selected>1280×720 (빠름)</option>
+                  <option value="1920x1080">1920×1080</option>
                 </select>
               </label>
               <label>FPS
@@ -210,6 +217,16 @@ export class DomMediaTimelineEditor {
             </div>
           </div>
         </section>
+      </div>
+      <div class="exme-export-overlay" data-role="export-overlay" hidden>
+        <div class="exme-export-card">
+          <div class="exme-export-title">MP4 Export 진행 중</div>
+          <div class="exme-export-msg" data-role="export-progress-text">준비 중…</div>
+          <div class="exme-export-track">
+            <div class="exme-export-bar" data-role="export-progress-bar"></div>
+          </div>
+          <p class="exme-export-hint">작업 파일은 게임 폴더 exports\\.work 에만 둡니다 (C: Temp 사용 안 함).<br/>끝나면 exports\\exgame-export-*.mp4 로 저장됩니다.</p>
+        </div>
       </div>
     `;
 
@@ -271,6 +288,9 @@ export class DomMediaTimelineEditor {
     this.imageLane = root.querySelector('[data-role="image-clips"]');
     this.previewStage = root.querySelector('[data-role="preview-stage"]');
     this.inspector = root.querySelector('[data-role="inspector"]');
+    this.exportOverlay = root.querySelector('[data-role="export-overlay"]');
+    this.exportProgressBar = root.querySelector('[data-role="export-progress-bar"]');
+    this.exportProgressText = root.querySelector('[data-role="export-progress-text"]');
   }
 
   private mountPreview(): void {
@@ -508,6 +528,19 @@ export class DomMediaTimelineEditor {
     this.setStatus(`배치: ${asset?.name ?? clip.id} · MP4/PNG 균등(시간 겹침 없음)`);
   }
 
+  private setExportProgress(message: string, progress = 0): void {
+    this.setStatus(message);
+    if (this.exportProgressText) this.exportProgressText.textContent = message;
+    if (this.exportProgressBar) {
+      this.exportProgressBar.style.width = `${Math.max(0, Math.min(100, progress))}%`;
+    }
+  }
+
+  private showExportOverlay(show: boolean): void {
+    if (!this.exportOverlay) return;
+    this.exportOverlay.hidden = !show;
+  }
+
   private async runExport(): Promise<void> {
     if (this.exporting) return;
     const snap = this.project.getSnapshot();
@@ -517,7 +550,8 @@ export class DomMediaTimelineEditor {
       return;
     }
     this.exporting = true;
-    this.setStatus('Export 시작…');
+    this.showExportOverlay(true);
+    this.setExportProgress('Export 시작…', 1);
     try {
       const status = await fetchExportStatus();
       if (!status.ready) {
@@ -525,14 +559,17 @@ export class DomMediaTimelineEditor {
           'ffmpeg.exe 없음. game/scripts/fetch-ffmpeg.ps1 실행 후 auto-run.bat 으로 다시 실행하세요.',
         );
       }
-      this.setStatus(`ffmpeg 준비됨 · Export 중… (${this.exportResolution} @ ${this.exportFps})`);
+      this.setExportProgress(
+        `업로드/인코딩 준비 (${this.exportResolution} @ ${this.exportFps})`,
+        4,
+      );
       const { blob, savedPath } = await exportTimelineMp4(
         snap,
         {
           resolution: this.exportResolution,
           fps: this.exportFps,
         },
-        (message) => this.setStatus(message),
+        (message, progress) => this.setExportProgress(message, progress ?? 0),
       );
       const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const filename = `exgame-export-${stamp}.mp4`;
@@ -548,14 +585,15 @@ export class DomMediaTimelineEditor {
         : picked
           ? `저장: ${picked}`
           : `브라우저 다운로드: ${filename} (다운로드 폴더 확인)`;
-      this.setStatus(`Export 완료 · ${savedPath || picked || filename}`);
+      this.setExportProgress(`Export 완료 · ${savedPath || picked || filename}`, 100);
       window.alert(`Export 완료\n\n${where}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Export 실패';
-      this.setStatus(message);
+      this.setExportProgress(message, 0);
       window.alert(`Export 실패\n\n${message}`);
     } finally {
       this.exporting = false;
+      this.showExportOverlay(false);
     }
   }
 
@@ -1077,6 +1115,30 @@ export class DomMediaTimelineEditor {
   background: #121722;
 }
 #${ROOT_ID} .exme-status { flex: 1; color: #9eb0c8; font-size: 13px; }
+#${ROOT_ID} .exme-export-overlay {
+  position: absolute; inset: 0; z-index: 50;
+  background: rgba(8, 12, 18, 0.72);
+  display: flex; align-items: center; justify-content: center;
+}
+#${ROOT_ID} .exme-export-overlay[hidden] { display: none !important; }
+#${ROOT_ID} .exme-export-card {
+  width: min(520px, 92vw); padding: 22px 24px;
+  border-radius: 14px; border: 1px solid #3a4d66;
+  background: #161d29; box-shadow: 0 18px 50px rgba(0,0,0,0.45);
+}
+#${ROOT_ID} .exme-export-title { font-size: 18px; font-weight: 800; margin-bottom: 10px; }
+#${ROOT_ID} .exme-export-msg { color: #c5d4e8; font-size: 13px; min-height: 1.4em; margin-bottom: 12px; }
+#${ROOT_ID} .exme-export-track {
+  height: 12px; border-radius: 999px; background: #243041; overflow: hidden;
+}
+#${ROOT_ID} .exme-export-bar {
+  height: 100%; width: 0%; border-radius: inherit;
+  background: linear-gradient(90deg, #3d8bff, #6ed0ff);
+  transition: width 0.25s ease;
+}
+#${ROOT_ID} .exme-export-hint {
+  margin: 14px 0 0; color: #8092ab; font-size: 12px; line-height: 1.45;
+}
 #${ROOT_ID} .exme-close, #${ROOT_ID} .exme-actions button, #${ROOT_ID} .exme-play,
 #${ROOT_ID} .exme-transport button {
   border: 1px solid #5a7a9a; border-radius: 8px; background: #1c2634;

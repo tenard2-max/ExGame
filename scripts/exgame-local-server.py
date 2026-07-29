@@ -302,9 +302,17 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
+    def _no_cache(self) -> None:
+        # Same URL path across ZIP versions (assets/main/index.js) is otherwise
+        # reused from Edge/Chrome disk cache and hides newer UI like MP4 button.
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
+
     def do_OPTIONS(self) -> None:  # noqa: N802
         self.send_response(204)
         self._cors()
+        self._no_cache()
         self.end_headers()
 
     def do_GET(self) -> None:  # noqa: N802
@@ -315,6 +323,7 @@ class Handler(BaseHTTPRequestHandler):
             ).encode("utf-8")
             self.send_response(200)
             self._cors()
+            self._no_cache()
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
@@ -339,6 +348,7 @@ class Handler(BaseHTTPRequestHandler):
         ctype = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
         self.send_response(200)
         self._cors()
+        self._no_cache()
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
@@ -370,6 +380,7 @@ class Handler(BaseHTTPRequestHandler):
                 payload = out.read_bytes()
             self.send_response(200)
             self._cors()
+            self._no_cache()
             self.send_header("Content-Type", "video/mp4")
             self.send_header("Content-Disposition", 'attachment; filename="exgame-export.mp4"')
             self.send_header("Content-Length", str(len(payload)))
@@ -382,6 +393,7 @@ class Handler(BaseHTTPRequestHandler):
             ).encode("utf-8")
             self.send_response(500)
             self._cors()
+            self._no_cache()
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(payload)))
             self.end_headers()

@@ -49,6 +49,12 @@ export class DomSaveControlsUi {
     this.saveSession = saveSession;
     this.buttons = [
       {
+        id: 'media',
+        code: '',
+        label: 'MP4 생성',
+        action: () => openMediaTimelineEditor(),
+      },
+      {
         id: 'save',
         code: 'KeyS',
         label: '저장  (S)',
@@ -76,12 +82,6 @@ export class DomSaveControlsUi {
           void this.saveSession?.startNewGame();
         },
         danger: true,
-      },
-      {
-        id: 'media',
-        code: '',
-        label: 'MP4 생성',
-        action: () => openMediaTimelineEditor(),
       },
     ];
     this.ensureStyle();
@@ -121,6 +121,11 @@ export class DomSaveControlsUi {
       });
       root.appendChild(el);
     }
+
+    const ver = document.createElement('div');
+    ver.className = 'exgame-save-build-tag';
+    ver.textContent = 'build media-ui';
+    root.appendChild(ver);
 
     const stack = document.getElementById(STACK_ID);
     if (isMobileShell() && stack) {
@@ -187,6 +192,14 @@ export class DomSaveControlsUi {
   background: rgba(28, 48, 40, 0.94);
   border-color: #6ecf9a;
   color: #e8fff3;
+}
+#${ROOT_ID} .exgame-save-build-tag {
+  pointer-events: none;
+  font-size: 11px;
+  color: #6ecf9a;
+  text-align: right;
+  padding: 0 4px;
+  opacity: 0.85;
 }
 body.exgame-mobile #${ROOT_ID}.exgame-save-controls,
 body.exgame-mobile #${ROOT_ID}.exgame-save-controls-in-stack {

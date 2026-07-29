@@ -106,9 +106,10 @@ export class DomSaveControlsUi {
     for (const button of this.buttons) {
       const el = document.createElement('button');
       el.type = 'button';
-      el.className = button.danger
-        ? 'exgame-save-btn exgame-save-btn-danger'
-        : 'exgame-save-btn';
+      let className = 'exgame-save-btn';
+      if (button.danger) className += ' exgame-save-btn-danger';
+      if (button.id === 'media') className += ' exgame-save-btn-media';
+      el.className = className;
       el.dataset.id = button.id;
       el.textContent = isMobileShell()
         ? button.label.replace(/\s*\([A-Z]\)\s*$/, '')
@@ -146,18 +147,25 @@ export class DomSaveControlsUi {
   z-index: 2147482900 !important;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  max-height: calc(100dvh - 24px);
+  overflow-x: hidden;
+  overflow-y: auto;
   pointer-events: none !important;
+  padding-bottom: 8px;
+  box-sizing: border-box;
 }
 #${ROOT_ID} .exgame-save-btn {
   pointer-events: auto !important;
   width: 200px;
-  height: 48px;
+  min-height: 40px;
+  height: 40px;
+  flex-shrink: 0;
   border: 2px solid #7896b4;
   border-radius: 10px;
   background: rgba(28, 38, 52, 0.92);
   color: #ebf5ff;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   cursor: pointer;
   font-family: "Pretendard", "Noto Sans KR", "Segoe UI", sans-serif;
@@ -175,6 +183,11 @@ export class DomSaveControlsUi {
   border-color: #ffaa6e;
   color: #ffe8d8;
 }
+#${ROOT_ID} .exgame-save-btn-media {
+  background: rgba(28, 48, 40, 0.94);
+  border-color: #6ecf9a;
+  color: #e8fff3;
+}
 body.exgame-mobile #${ROOT_ID}.exgame-save-controls,
 body.exgame-mobile #${ROOT_ID}.exgame-save-controls-in-stack {
   position: static !important;
@@ -183,16 +196,22 @@ body.exgame-mobile #${ROOT_ID}.exgame-save-controls-in-stack {
   z-index: auto !important;
   gap: 5px;
   margin-top: 2px;
+  max-height: none;
+  overflow: visible;
+  padding-bottom: 0;
 }
 body.exgame-mobile #${ROOT_ID}.exgame-save-controls:not(.exgame-save-controls-in-stack) {
   position: fixed !important;
   left: max(8px, env(safe-area-inset-left, 0px)) !important;
   top: 72px !important;
   right: auto !important;
+  max-height: calc(100dvh - 80px);
+  overflow-y: auto;
 }
 body.exgame-mobile #${ROOT_ID} .exgame-save-btn {
   width: 100px;
   height: 24px;
+  min-height: 24px;
   border-width: 1px;
   border-radius: 6px;
   font-size: 9px;

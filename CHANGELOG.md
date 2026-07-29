@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.31 — 2026-07-29
+
+### 개선
+- Media Editor: 클립 본문 드래그로 트랙 내 순서 변경 (duration 유지·순차 pack)
+- Export: 단일 ffmpeg filter_complex로 통합 (긴 타임라인 속도 개선)
+- Export: PNG 알파 Overlay 유지, Quality는 PNG 있으면 CRF17 / 없으면 CRF20
+
 ## 0.1.30 — 2026-07-29
 
 ### 추가

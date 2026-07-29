@@ -34,6 +34,13 @@ type ResizeSession = {
   pxPerSec: number;
 };
 
+type MoveSession = {
+  clipId: string;
+  trackId: string;
+  startX: number;
+  moved: boolean;
+};
+
 export class DomMediaTimelineEditor {
   private root: HTMLDivElement | null = null;
   private readonly project = new MediaTimelineProject();
@@ -43,6 +50,7 @@ export class DomMediaTimelineEditor {
   private playing = false;
   private rafId = 0;
   private resizeSession: ResizeSession | null = null;
+  private moveSession: MoveSession | null = null;
   private zoom = 1;
   private exportResolution: ExportResolution = '1920x1080';
   private exportFps: ExportFps = 30;
@@ -170,7 +178,7 @@ export class DomMediaTimelineEditor {
                   <option value="60">60</option>
                 </select>
               </label>
-              <p class="exme-quality-hint">Quality: PNG 기준(없으면 MP4)</p>
+              <p class="exme-quality-hint">Quality: PNG 있으면 고화질(CRF17), 없으면 MP4(CRF20)</p>
             </div>
             <button type="button" data-action="export">MP4 Export</button>
             <p class="exme-folder" data-role="folder-label">폴더: (없음)</p>
@@ -224,6 +232,8 @@ export class DomMediaTimelineEditor {
     window.removeEventListener('keydown', this.onKeyDown, true);
     window.removeEventListener('pointermove', this.onResizePointerMove);
     window.removeEventListener('pointerup', this.onResizePointerUp);
+    window.removeEventListener('pointermove', this.onMovePointerMove);
+    window.removeEventListener('pointerup', this.onMovePointerUp);
     this.project.dispose();
     this.audio.removeAttribute('src');
     this.audio.load();
@@ -819,17 +829,95 @@ export class DomMediaTimelineEditor {
         this.beginResize(clip, event as PointerEvent);
         return;
       }
+      event.preventDefault();
       event.stopPropagation();
-      this.project.selectClip(clip.id);
+      this.beginMove(clip, event as PointerEvent);
     });
 
     return el;
   }
 
+  private beginMove(clip: TimelineClip, event: PointerEvent): void {
+    this.project.selectClip(clip.id);
+    this.moveSession = {
+      clipId: clip.id,
+      trackId: clip.trackId,
+      startX: event.clientX,
+      moved: false,
+    };
+    const el = this.root?.querySelector(
+      `.exme-clip[data-clip-id="${clip.id}"]`,
+    ) as HTMLElement | null;
+    el?.classList.add('is-dragging');
+    window.addEventListener('pointermove', this.onMovePointerMove);
+    window.addEventListener('pointerup', this.onMovePointerUp);
+  }
+
+  private readonly onMovePointerMove = (event: PointerEvent): void => {
+    if (!this.moveSession) return;
+    if (Math.abs(event.clientX - this.moveSession.startX) > 6) {
+      this.moveSession.moved = true;
+    }
+    if (!this.moveSession.moved || !this.ruler) return;
+    const body = this.laneBodyForTrack(this.moveSession.trackId);
+    if (!body) return;
+    const rect = body.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    const ghost = this.root?.querySelector(
+      `.exme-clip[data-clip-id="${this.moveSession.clipId}"]`,
+    ) as HTMLElement | null;
+    if (ghost) {
+      ghost.style.outline = '2px dashed #ffe08a';
+      ghost.dataset.dropRatio = String(ratio);
+    }
+  };
+
+  private readonly onMovePointerUp = (event: PointerEvent): void => {
+    const session = this.moveSession;
+    this.moveSession = null;
+    window.removeEventListener('pointermove', this.onMovePointerMove);
+    window.removeEventListener('pointerup', this.onMovePointerUp);
+    if (!session) return;
+
+    const ghost = this.root?.querySelector(
+      `.exme-clip[data-clip-id="${session.clipId}"]`,
+    ) as HTMLElement | null;
+    ghost?.classList.remove('is-dragging');
+    if (ghost) ghost.style.outline = '';
+
+    if (!session.moved) return;
+
+    const body = this.laneBodyForTrack(session.trackId);
+    if (!body) return;
+    const rect = body.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    const snap = this.project.getSnapshot();
+    const trackClips = snap.clips.filter((clip) => clip.trackId === session.trackId);
+    if (trackClips.length <= 1) return;
+    const toIndex = Math.min(
+      trackClips.length - 1,
+      Math.max(0, Math.floor(ratio * trackClips.length)),
+    );
+    if (this.project.reorderClip(session.clipId, toIndex)) {
+      this.setStatus('클립 순서를 변경했습니다.');
+    }
+  };
+
+  private laneBodyForTrack(trackId: string): HTMLElement | null {
+    const snap = this.project.getSnapshot();
+    const track = snap.tracks.find((entry) => entry.id === trackId);
+    if (!track) return null;
+    if (track.kind === TRACK_KIND_VIDEO) return this.videoLane;
+    if (track.kind === TRACK_KIND_IMAGE) return this.imageLane;
+    return null;
+  }
+
   private beginResize(clip: TimelineClip, event: PointerEvent): void {
     const master = this.project.getSnapshot().masterDurationSec;
     if (!this.ruler || master <= 0) return;
-    const body = this.ruler.querySelector('.exme-lane-body') as HTMLElement | null;
+    const body = this.laneBodyForTrack(clip.trackId) ?? this.videoLane;
     const width = (body ?? this.ruler).getBoundingClientRect().width;
     if (width <= 0) return;
     this.resizeSession = {
@@ -1033,8 +1121,11 @@ export class DomMediaTimelineEditor {
 #${ROOT_ID} .exme-clip {
   position: absolute; top: 4px; bottom: 4px;
   border-radius: 4px; background: #2a4a78; border: 1px solid #6aa1ff;
-  overflow: hidden; cursor: pointer; z-index: 1;
+  overflow: hidden; cursor: grab; z-index: 1;
   box-sizing: border-box; min-width: 4px;
+}
+#${ROOT_ID} .exme-clip.is-dragging {
+  cursor: grabbing; opacity: 0.75; z-index: 3;
 }
 #${ROOT_ID} .exme-track-image .exme-clip {
   background: #3a3a58; border-color: #c9a0ff;

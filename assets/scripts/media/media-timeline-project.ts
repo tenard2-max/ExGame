@@ -3,7 +3,9 @@
  * Master Timeline 길이는 로드된 MP3 duration 과 동일합니다.
  */
 import {
+  applyAdjacentFades,
   createDefaultTracks,
+  packSequential,
   rebalanceTrackEqual,
   resizeClipOnTrack,
   trackIdForAssetKind,
@@ -208,32 +210,45 @@ export class MediaTimelineProject {
     return true;
   }
 
-  /** 클립 순서 변경(같은 트랙) 후 현재 duration을 유지한 채 pack — drop index 기반. */
+  /**
+   * 같은 트랙 내 순서만 변경. duration은 유지하고 순차 pack(균등 재배치하지 않음).
+   * toIndex: 이동 후 트랙 내 목표 인덱스(0-based).
+   */
   reorderClip(clipId: string, toIndex: number): boolean {
-    const fromIndex = this.clips.findIndex((clip) => clip.id === clipId);
-    if (fromIndex < 0) return false;
-    const [clip] = this.clips.splice(fromIndex, 1);
-    const trackClips = this.clips.filter((entry) => entry.trackId === clip.trackId);
-    const bounded = Math.max(0, Math.min(toIndex, trackClips.length));
-    // 전체 배열에서 같은 트랙의 bounded번째 위치로 삽입
-    let seen = 0;
-    let insertAt = this.clips.length;
-    for (let i = 0; i < this.clips.length; i += 1) {
-      if (this.clips[i].trackId !== clip.trackId) continue;
-      if (seen === bounded) {
-        insertAt = i;
-        break;
-      }
-      seen += 1;
-    }
-    if (seen < bounded) insertAt = this.clips.length;
-    this.clips.splice(insertAt, 0, clip);
+    const trackId = this.clips.find((entry) => entry.id === clipId)?.trackId;
+    if (!trackId) return false;
 
-    const master = this.masterAudio?.durationSec ?? 0;
-    // 이동 후 균등 재배치(겹침 방지 + 섹터 채움)
-    if (master > 0) {
-      rebalanceTrackEqual(this.clips, clip.trackId, master, this.assets);
+    const trackIndices: number[] = [];
+    for (let i = 0; i < this.clips.length; i += 1) {
+      if (this.clips[i].trackId === trackId) trackIndices.push(i);
     }
+    const fromTrackPos = trackIndices.findIndex(
+      (globalIndex) => this.clips[globalIndex].id === clipId,
+    );
+    if (fromTrackPos < 0) return false;
+    const bounded = Math.max(0, Math.min(toIndex, trackIndices.length - 1));
+    if (fromTrackPos === bounded) {
+      this.selectedClipId = clipId;
+      this.emit();
+      return false;
+    }
+
+    const globalFrom = trackIndices[fromTrackPos];
+    const [clip] = this.clips.splice(globalFrom, 1);
+    // splice 후 트랙 인덱스 재계산
+    const afterIndices: number[] = [];
+    for (let i = 0; i < this.clips.length; i += 1) {
+      if (this.clips[i].trackId === trackId) afterIndices.push(i);
+    }
+    const insertGlobal =
+      bounded >= afterIndices.length
+        ? this.clips.length
+        : afterIndices[bounded];
+    this.clips.splice(insertGlobal, 0, clip);
+
+    const trackClips = this.clips.filter((entry) => entry.trackId === trackId);
+    packSequential(trackClips);
+    applyAdjacentFades(trackClips);
     this.selectedClipId = clip.id;
     this.emit();
     return true;

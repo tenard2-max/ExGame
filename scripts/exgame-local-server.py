@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""ExGame local static server + Media Editor MP4 export (ffmpeg.exe)."""
+"""ExGame local static server + Media Editor MP4 export (ffmpeg.exe).
+
+Export uses a single ffmpeg filter_complex pass for speed.
+PNG overlays keep alpha when possible; quality CRF prefers PNG when present.
+"""
 
 from __future__ import annotations
 
@@ -96,97 +100,55 @@ def run(cmd: list[str]) -> None:
         )
 
 
-def render_segment(
-    ffmpeg: Path,
-    src: Path,
-    out: Path,
+def clip_prep_filters(
+    input_idx: int,
+    label: str,
+    clip: dict,
     *,
-    duration: float,
     width: int,
     height: int,
-    fps: int,
-    scale: float,
-    opacity: float,
-    fade_in: float,
-    fade_out: float,
-    loop: bool,
     keep_alpha: bool,
-) -> None:
-    vf = [
+) -> str:
+    """Return filter chain that ends with labeled output, e.g. [v0]."""
+    start = float(clip.get("startSec", 0))
+    dur = float(clip.get("durationSec", 0))
+    scale = float(clip.get("scale", 1) or 1)
+    opacity = max(0.0, min(1.0, float(clip.get("opacity", 1) or 1)))
+    fade_in = float(clip.get("fadeInSec", 0) or 0)
+    fade_out = float(clip.get("fadeOutSec", 0) or 0)
+
+    parts: list[str] = [
+        f"[{input_idx}:v]",
+        f"trim=duration={dur:.6f}",
+        "setpts=PTS-STARTPTS",
         f"scale=iw*{scale}:ih*{scale}",
         f"scale={width}:{height}:force_original_aspect_ratio=decrease",
     ]
     if keep_alpha:
-        vf += [
+        parts += [
             f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=0x00000000",
             "format=rgba",
-            f"colorchannelmixer=aa={max(0.0, min(1.0, opacity))}",
+            f"colorchannelmixer=aa={opacity}",
         ]
     else:
-        vf += [
+        parts += [
             f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:black",
             "format=yuv420p",
         ]
+
     if fade_in > 0:
-        vf.append(
-            f"fade=t=in:st=0:d={fade_in:.6f}"
-            + (":alpha=1" if keep_alpha else "")
-        )
+        alpha = ":alpha=1" if keep_alpha else ""
+        parts.append(f"fade=t=in:st=0:d={fade_in:.6f}{alpha}")
     if fade_out > 0:
-        st = max(0.0, duration - fade_out)
-        vf.append(
-            f"fade=t=out:st={st:.6f}:d={fade_out:.6f}"
-            + (":alpha=1" if keep_alpha else "")
-        )
+        st = max(0.0, dur - fade_out)
+        alpha = ":alpha=1" if keep_alpha else ""
+        parts.append(f"fade=t=out:st={st:.6f}:d={fade_out:.6f}{alpha}")
 
-    cmd = [str(ffmpeg), "-y"]
-    if loop:
-        cmd += ["-stream_loop", "-1"]
-    cmd += ["-i", str(src), "-t", f"{duration:.6f}", "-r", str(fps), "-vf", ",".join(vf), "-an"]
-    if keep_alpha:
-        cmd += ["-c:v", "png", str(out)]
-    else:
-        cmd += ["-c:v", "libx264", "-pix_fmt", "yuv420p", str(out)]
-    run(cmd)
-
-
-def overlay_segment(
-    ffmpeg: Path,
-    base: Path,
-    seg: Path,
-    out: Path,
-    *,
-    start: float,
-    duration: float,
-    master: float,
-    has_alpha: bool,
-) -> None:
-    end = start + duration
-    if has_alpha:
-        fc = f"[0:v][1:v]overlay=0:0:enable='between(t,{start:.6f},{end:.6f})':format=auto[v]"
-    else:
-        fc = f"[0:v][1:v]overlay=0:0:enable='between(t,{start:.6f},{end:.6f})'[v]"
-    run(
-        [
-            str(ffmpeg),
-            "-y",
-            "-i",
-            str(base),
-            "-i",
-            str(seg),
-            "-filter_complex",
-            fc,
-            "-map",
-            "[v]",
-            "-c:v",
-            "libx264",
-            "-pix_fmt",
-            "yuv420p",
-            "-t",
-            f"{master:.6f}",
-            str(out),
-        ]
-    )
+    # Delay onto master timeline, then pad/tpad silence not needed — overlay enable handles window.
+    parts.append(f"setpts=PTS-STARTPTS+{start:.6f}/TB")
+    # Join with commas but first tag is separate
+    body = parts[0] + ",".join(parts[1:]) + f"[{label}]"
+    return body
 
 
 def build_export(job: dict, file_map: dict[str, Path], work: Path, ffmpeg: Path) -> Path:
@@ -200,106 +162,122 @@ def build_export(job: dict, file_map: dict[str, Path], work: Path, ffmpeg: Path)
     if not audio_id or audio_id not in file_map:
         raise ValueError("master audio missing")
 
-    current = work / "base.mp4"
+    video_clips = [c for c in (job.get("videoClips") or []) if float(c.get("durationSec", 0)) > 0]
+    image_clips = [c for c in (job.get("imageClips") or []) if float(c.get("durationSec", 0)) > 0]
+    has_png = len(image_clips) > 0
+    # Quality: PNG present -> higher quality (lower CRF); else MP4 baseline
+    crf = "17" if has_png else "20"
+    preset = "veryfast"
+
+    cmd: list[str] = [str(ffmpeg), "-y", "-hide_banner", "-loglevel", "error"]
+    # 0: black base
+    cmd += [
+        "-f",
+        "lavfi",
+        "-i",
+        f"color=c=black:s={width}x{height}:d={master:.6f}:r={fps}",
+    ]
+    # 1: master audio
+    cmd += ["-i", str(file_map[audio_id])]
+
+    clip_meta: list[tuple[int, dict, bool]] = []
+    next_idx = 2
+
+    for clip in video_clips:
+        src = file_map.get(clip["assetId"])
+        if not src:
+            raise ValueError(f"asset missing: {clip['assetId']}")
+        if bool(clip.get("loop", False)):
+            cmd += ["-stream_loop", "-1"]
+        cmd += ["-i", str(src)]
+        clip_meta.append((next_idx, clip, False))
+        next_idx += 1
+
+    for clip in image_clips:
+        src = file_map.get(clip["assetId"])
+        if not src:
+            raise ValueError(f"asset missing: {clip['assetId']}")
+        cmd += ["-loop", "1", "-t", f"{float(clip.get('durationSec', 0)):.6f}", "-i", str(src)]
+        clip_meta.append((next_idx, clip, True))
+        next_idx += 1
+
+    out = work / "output.mp4"
+
+    if not clip_meta:
+        # audio-only black video
+        run(
+            cmd
+            + [
+                "-map",
+                "0:v:0",
+                "-map",
+                "1:a:0",
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                "-preset",
+                preset,
+                "-crf",
+                crf,
+                "-c:a",
+                "aac",
+                "-b:a",
+                "192k",
+                "-shortest",
+                "-t",
+                f"{master:.6f}",
+                str(out),
+            ]
+        )
+        return out
+
+    filters: list[str] = []
+    labels: list[tuple[str, dict, bool]] = []
+    for i, (in_idx, clip, is_image) in enumerate(clip_meta):
+        label = f"c{i}"
+        filters.append(
+            clip_prep_filters(
+                in_idx,
+                label,
+                clip,
+                width=width,
+                height=height,
+                keep_alpha=is_image,
+            )
+        )
+        labels.append((label, clip, is_image))
+
+    prev = "0:v"
+    for i, (label, clip, is_image) in enumerate(labels):
+        start = float(clip.get("startSec", 0))
+        dur = float(clip.get("durationSec", 0))
+        end = start + dur
+        out_lab = f"b{i}"
+        fmt = ":format=auto" if is_image else ""
+        filters.append(
+            f"[{prev}][{label}]overlay=0:0:enable='between(t\\,{start:.6f}\\,{end:.6f})'{fmt}[{out_lab}]"
+        )
+        prev = out_lab
+
+    filter_complex = ";".join(filters)
     run(
-        [
-            str(ffmpeg),
-            "-y",
-            "-f",
-            "lavfi",
-            "-i",
-            f"color=c=black:s={width}x{height}:d={master:.6f}:r={fps}",
+        cmd
+        + [
+            "-filter_complex",
+            filter_complex,
+            "-map",
+            f"[{prev}]",
+            "-map",
+            "1:a:0",
             "-c:v",
             "libx264",
             "-pix_fmt",
             "yuv420p",
-            "-t",
-            f"{master:.6f}",
-            str(current),
-        ]
-    )
-
-    def apply_clips(clips: list, *, images: bool) -> None:
-        nonlocal current
-        for index, clip in enumerate(clips):
-            asset_id = clip["assetId"]
-            src = file_map.get(asset_id)
-            if not src:
-                raise ValueError(f"asset missing: {asset_id}")
-            start = float(clip.get("startSec", 0))
-            dur = float(clip.get("durationSec", 0))
-            if dur <= 0:
-                continue
-            keep_alpha = images
-            seg = work / (f"seg_img_{index}.mov" if images else f"seg_vid_{index}.mp4")
-            try:
-                render_segment(
-                    ffmpeg,
-                    src,
-                    seg,
-                    duration=dur,
-                    width=width,
-                    height=height,
-                    fps=fps,
-                    scale=float(clip.get("scale", 1) or 1),
-                    opacity=float(clip.get("opacity", 1) or 1),
-                    fade_in=float(clip.get("fadeInSec", 0) or 0),
-                    fade_out=float(clip.get("fadeOutSec", 0) or 0),
-                    loop=bool(clip.get("loop", images)),
-                    keep_alpha=keep_alpha,
-                )
-            except RuntimeError:
-                if not keep_alpha:
-                    raise
-                # PNG alpha 코덱 실패 시 opaque fallback
-                seg = work / f"seg_img_{index}.mp4"
-                render_segment(
-                    ffmpeg,
-                    src,
-                    seg,
-                    duration=dur,
-                    width=width,
-                    height=height,
-                    fps=fps,
-                    scale=float(clip.get("scale", 1) or 1),
-                    opacity=float(clip.get("opacity", 1) or 1),
-                    fade_in=float(clip.get("fadeInSec", 0) or 0),
-                    fade_out=float(clip.get("fadeOutSec", 0) or 0),
-                    loop=True,
-                    keep_alpha=False,
-                )
-                keep_alpha = False
-            out = work / f"layer_{'i' if images else 'v'}_{index}.mp4"
-            overlay_segment(
-                ffmpeg,
-                current,
-                seg,
-                out,
-                start=start,
-                duration=dur,
-                master=master,
-                has_alpha=keep_alpha,
-            )
-            current = out
-
-    apply_clips(list(job.get("videoClips") or []), images=False)
-    apply_clips(list(job.get("imageClips") or []), images=True)
-
-    out = work / "output.mp4"
-    run(
-        [
-            str(ffmpeg),
-            "-y",
-            "-i",
-            str(current),
-            "-i",
-            str(file_map[audio_id]),
-            "-map",
-            "0:v:0",
-            "-map",
-            "1:a:0",
-            "-c:v",
-            "copy",
+            "-preset",
+            preset,
+            "-crf",
+            crf,
             "-c:a",
             "aac",
             "-b:a",
@@ -314,7 +292,7 @@ def build_export(job: dict, file_map: dict[str, Path], work: Path, ffmpeg: Path)
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "ExGameLocal/1.0"
+    server_version = "ExGameLocal/1.1"
 
     def log_message(self, fmt: str, *args) -> None:  # noqa: A003
         print("[%s] %s" % (self.log_date_time_string(), fmt % args))
@@ -378,8 +356,7 @@ class Handler(BaseHTTPRequestHandler):
             ffmpeg = resolve_ffmpeg(self.server.ffmpeg_roots)  # type: ignore[attr-defined]
             if not ffmpeg:
                 raise FileNotFoundError(
-                    "ffmpeg.exe를 찾을 수 없습니다. tools/ffmpeg/ffmpeg.exe 를 두거나 "
-                    "scripts/fetch-ffmpeg.ps1 을 실행하세요."
+                    "ffmpeg.exe not found. Place tools/ffmpeg/ffmpeg.exe or run scripts/fetch-ffmpeg.ps1"
                 )
             with tempfile.TemporaryDirectory(prefix="exme_export_") as tmp:
                 work = Path(tmp)
@@ -431,7 +408,7 @@ def main() -> None:
     print(f"ExGame local server http://{args.bind}:{args.port}/")
     print(f"root={game_root}")
     ff = resolve_ffmpeg(ffmpeg_roots)
-    print(f"ffmpeg={'READY ' + str(ff) if ff else 'MISSING — run scripts/fetch-ffmpeg.ps1'}")
+    print(f"ffmpeg={'READY ' + str(ff) if ff else 'MISSING - run scripts/fetch-ffmpeg.ps1'}")
     server.serve_forever()
 
 

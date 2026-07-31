@@ -35,6 +35,8 @@ import {
   isInventoryMenuOpen,
   isLoadMenuOpen,
   isPotionMenuOpen,
+  resolveUiFontSize,
+  resolveUiLineHeight,
 } from './hud-layout';
 
 const { ccclass } = _decorator;
@@ -143,8 +145,8 @@ export class HotbarHud extends Component {
     node.setPosition(0, HOTBAR_SLOT_SIZE / 2 + 28, 0);
     node.addComponent(UITransform).setContentSize(220, 28);
     const label = node.addComponent(Label);
-    label.fontSize = 18;
-    label.lineHeight = 22;
+    label.fontSize = resolveUiFontSize(18);
+    label.lineHeight = resolveUiLineHeight(22);
     label.color = new Color(255, 250, 210, 255);
     label.string = '';
     label.horizontalAlign = Label.HorizontalAlign.CENTER;
@@ -171,8 +173,8 @@ export class HotbarHud extends Component {
       slotNode.addChild(nameNode);
       nameNode.setPosition(0, 14);
       const nameLabel = nameNode.addComponent(Label);
-      nameLabel.fontSize = 16;
-      nameLabel.lineHeight = 20;
+      nameLabel.fontSize = resolveUiFontSize(16);
+      nameLabel.lineHeight = resolveUiLineHeight(20);
       nameLabel.color = new Color(235, 245, 255, 255);
       nameLabel.string = `${index + 1} ${getItemDefinition(itemId).displayName}`;
 
@@ -181,8 +183,8 @@ export class HotbarHud extends Component {
       slotNode.addChild(countNode);
       countNode.setPosition(0, -16);
       const countLabel = countNode.addComponent(Label);
-      countLabel.fontSize = 20;
-      countLabel.lineHeight = 24;
+      countLabel.fontSize = resolveUiFontSize(20);
+      countLabel.lineHeight = resolveUiLineHeight(24);
       countLabel.color = new Color(255, 235, 160, 255);
       countLabel.string = '0';
 

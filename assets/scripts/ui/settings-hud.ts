@@ -40,6 +40,8 @@ import {
   SETTINGS_PANEL_HEIGHT,
   SETTINGS_PANEL_WIDTH,
   SETTINGS_ROW_HEIGHT,
+  resolveUiFontSize,
+  resolveUiLineHeight,
 } from './hud-layout';
 import { isMobileShell } from './mobile-shell';
 
@@ -566,8 +568,8 @@ export class SettingsHud extends Component {
     parent.addChild(valueNode);
     valueNode.setPosition(90, rowY);
     const valueLabel = valueNode.addComponent(Label);
-    valueLabel.fontSize = 16;
-    valueLabel.lineHeight = 20;
+    valueLabel.fontSize = resolveUiFontSize(16);
+    valueLabel.lineHeight = resolveUiLineHeight(20);
     valueLabel.color = new Color(255, 230, 120, 255);
     valueLabel.string = this.balance?.formatValue(key) ?? '';
     this.valueLabels.set(key, valueLabel);
@@ -602,8 +604,8 @@ export class SettingsHud extends Component {
     labelNode.layer = Layers.Enum.UI_2D;
     button.addChild(labelNode);
     const label = labelNode.addComponent(Label);
-    label.fontSize = 22;
-    label.lineHeight = 26;
+    label.fontSize = resolveUiFontSize(22);
+    label.lineHeight = resolveUiLineHeight(26);
     label.color = new Color(245, 250, 255, 255);
     label.string = text;
     return button;
@@ -625,8 +627,8 @@ export class SettingsHud extends Component {
     labelNode.layer = Layers.Enum.UI_2D;
     button.addChild(labelNode);
     const label = labelNode.addComponent(Label);
-    label.fontSize = 18;
-    label.lineHeight = 22;
+    label.fontSize = resolveUiFontSize(18);
+    label.lineHeight = resolveUiLineHeight(22);
     label.color = new Color(245, 250, 255, 255);
     label.string = text;
   }
@@ -643,8 +645,8 @@ export class SettingsHud extends Component {
     parent.addChild(node);
     node.setPosition(x, y);
     const label = node.addComponent(Label);
-    label.fontSize = fontSize;
-    label.lineHeight = fontSize + 4;
+    label.fontSize = resolveUiFontSize(fontSize);
+    label.lineHeight = resolveUiLineHeight(fontSize + 4);
     label.color = new Color(235, 245, 255, 255);
     label.string = text;
   }

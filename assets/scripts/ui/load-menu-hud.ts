@@ -32,6 +32,8 @@ import {
   DESIGN_HEIGHT,
   DESIGN_WIDTH,
   normalizeUiToDesign,
+  resolveUiFontSize,
+  resolveUiLineHeight,
   setLoadMenuOpen,
 } from './hud-layout';
 
@@ -404,8 +406,8 @@ export class LoadMenuHud extends Component {
     titleNode.addComponent(UITransform).setContentSize(PANEL_WIDTH - 24, 36);
     const title = titleNode.addComponent(Label);
     title.string = `불러오기 (세이브 1~${FIXED_SAVE_SLOT_COUNT})`;
-    title.fontSize = 26;
-    title.lineHeight = 30;
+    title.fontSize = resolveUiFontSize(26);
+    title.lineHeight = resolveUiLineHeight(30);
     title.color = new Color(235, 245, 255, 255);
     this.titleLabel = title;
 
@@ -428,8 +430,8 @@ export class LoadMenuHud extends Component {
       rowNode.addChild(labelNode);
       labelNode.addComponent(UITransform).setContentSize(PANEL_WIDTH - 64, ROW_HEIGHT - 8);
       const label = labelNode.addComponent(Label);
-      label.fontSize = 20;
-      label.lineHeight = 26;
+      label.fontSize = resolveUiFontSize(20);
+      label.lineHeight = resolveUiLineHeight(26);
       label.color = new Color(255, 255, 255, 255);
       label.horizontalAlign = Label.HorizontalAlign.LEFT;
       label.verticalAlign = Label.VerticalAlign.CENTER;
@@ -453,8 +455,8 @@ export class LoadMenuHud extends Component {
     hintNode.setPosition(0, -PANEL_HEIGHT / 2 + 24, 0);
     hintNode.addComponent(UITransform).setContentSize(PANEL_WIDTH - 32, 28);
     const hint = hintNode.addComponent(Label);
-    hint.fontSize = 17;
-    hint.lineHeight = 22;
+    hint.fontSize = resolveUiFontSize(17);
+    hint.lineHeight = resolveUiLineHeight(22);
     hint.color = new Color(180, 200, 220, 255);
     hint.string = '';
     this.hintLabel = hint;

@@ -10,7 +10,7 @@ import {
 } from '../input/dom-keyboard';
 import type { SaveSessionController } from '../save/save-session-controller';
 import { openMediaTimelineEditor } from './dom-media-timeline-editor';
-import { isMobileShell } from './mobile-shell';
+import { isMobileShell, mobileFontUnifyCss } from './mobile-shell';
 
 const ROOT_ID = 'exgame-save-controls';
 const STYLE_ID = 'exgame-save-controls-style';
@@ -227,9 +227,9 @@ body.exgame-mobile #${ROOT_ID} .exgame-save-btn {
   min-height: 24px;
   border-width: 1px;
   border-radius: 6px;
-  font-size: 9px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
+${mobileFontUnifyCss(`#${ROOT_ID}`)}
 `;
   }
 }

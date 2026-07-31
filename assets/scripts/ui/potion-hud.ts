@@ -34,6 +34,8 @@ import {
   DESIGN_HEIGHT,
   DESIGN_WIDTH,
   normalizeUiToDesign,
+  resolveUiFontSize,
+  resolveUiLineHeight,
   setPotionMenuOpen,
 } from './hud-layout';
 import {
@@ -224,8 +226,8 @@ export class PotionHud extends Component {
     titleNode.addComponent(UITransform).setContentSize(PANEL_WIDTH - 24, 32);
     const title = titleNode.addComponent(Label);
     title.string = '포션 사용 (E·ESC 닫기 / 1~3)';
-    title.fontSize = 22;
-    title.lineHeight = 26;
+    title.fontSize = resolveUiFontSize(22);
+    title.lineHeight = resolveUiLineHeight(26);
     title.color = new Color(230, 240, 255, 255);
 
     const startY = 48;
@@ -264,8 +266,8 @@ export class PotionHud extends Component {
         ROW_HEIGHT,
       );
       const label = labelNode.addComponent(Label);
-      label.fontSize = 20;
-      label.lineHeight = 24;
+      label.fontSize = resolveUiFontSize(20);
+      label.lineHeight = resolveUiLineHeight(24);
       label.color = new Color(255, 255, 255, 255);
       label.horizontalAlign = Label.HorizontalAlign.LEFT;
       label.verticalAlign = Label.VerticalAlign.CENTER;

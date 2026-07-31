@@ -45,6 +45,8 @@ import {
   DESIGN_HEIGHT,
   DESIGN_WIDTH,
   normalizeUiToDesign,
+  resolveUiFontSize,
+  resolveUiLineHeight,
   setInventoryMenuOpen,
 } from './hud-layout';
 import {
@@ -350,8 +352,8 @@ export class InventoryHud extends Component {
     panel.addChild(titleNode);
     titleNode.setPosition(0, PANEL_HEIGHT / 2 - 24, 0);
     const title = titleNode.addComponent(Label);
-    title.fontSize = 22;
-    title.lineHeight = 26;
+    title.fontSize = resolveUiFontSize(22);
+    title.lineHeight = resolveUiLineHeight(26);
     title.color = new Color(240, 248, 255, 255);
     title.string = '아이템 (I) — 검:1번 / 갑옷:몸통 · 휠 스크롤';
     title.horizontalAlign = Label.HorizontalAlign.CENTER;
@@ -389,8 +391,8 @@ export class InventoryHud extends Component {
     summaryNode.addChild(summaryLabelNode);
     summaryLabelNode.setPosition(0, 0, 0);
     const summaryLabel = summaryLabelNode.addComponent(Label);
-    summaryLabel.fontSize = 16;
-    summaryLabel.lineHeight = 22;
+    summaryLabel.fontSize = resolveUiFontSize(16);
+    summaryLabel.lineHeight = resolveUiLineHeight(22);
     summaryLabel.color = new Color(255, 230, 170, 255);
     summaryLabel.string = '장착 중\n무기: 주먹 · 갑옷: 없음';
     summaryLabel.horizontalAlign = Label.HorizontalAlign.CENTER;
@@ -411,8 +413,8 @@ export class InventoryHud extends Component {
     panel.addChild(hintNode);
     hintNode.setPosition(0, -PANEL_HEIGHT / 2 + 22, 0);
     const hint = hintNode.addComponent(Label);
-    hint.fontSize = 15;
-    hint.lineHeight = 18;
+    hint.fontSize = resolveUiFontSize(15);
+    hint.lineHeight = resolveUiLineHeight(18);
     hint.color = new Color(180, 200, 220, 255);
     hint.string = '강화 장비는 상단 · 마우스 올리면 옵션 · 재클릭=해제';
     hint.horizontalAlign = Label.HorizontalAlign.CENTER;
@@ -439,7 +441,7 @@ export class InventoryHud extends Component {
       listRoot.addChild(empty);
       empty.setPosition(0, 0, 0);
       const label = empty.addComponent(Label);
-      label.fontSize = 20;
+      label.fontSize = resolveUiFontSize(20);
       label.color = new Color(160, 170, 180, 255);
       label.string = '소지 아이템이 없습니다';
       this.rows.push({
@@ -507,8 +509,8 @@ export class InventoryHud extends Component {
     labelNode.layer = Layers.Enum.UI_2D;
     rowNode.addChild(labelNode);
     const label = labelNode.addComponent(Label);
-    label.fontSize = 15;
-    label.lineHeight = 18;
+    label.fontSize = resolveUiFontSize(15);
+    label.lineHeight = resolveUiLineHeight(18);
     label.color = new Color(170, 190, 220, 255);
     label.string = title;
     label.horizontalAlign = Label.HorizontalAlign.LEFT;
@@ -561,8 +563,8 @@ export class InventoryHud extends Component {
     rowNode.addChild(labelNode);
     labelNode.setPosition(isEquipped ? -4 : 8, 0, 0);
     const label = labelNode.addComponent(Label);
-    label.fontSize = 17;
-    label.lineHeight = 21;
+    label.fontSize = resolveUiFontSize(17);
+    label.lineHeight = resolveUiLineHeight(21);
     label.color = new Color(235, 220, 255, 255);
     label.string = `${definition.displayName} +${gear.upgradeLevel}`
       + `  ATK+${gear.bonusAttack} DEF+${gear.bonusDefense}`
@@ -638,8 +640,8 @@ export class InventoryHud extends Component {
     rowNode.addChild(labelNode);
     labelNode.setPosition(isEquipped ? -4 : 8, 0, 0);
     const label = labelNode.addComponent(Label);
-    label.fontSize = 18;
-    label.lineHeight = 22;
+    label.fontSize = resolveUiFontSize(18);
+    label.lineHeight = resolveUiLineHeight(22);
     label.color = isEquipped
       ? new Color(255, 236, 180, 255)
       : new Color(235, 245, 255, 255);
@@ -670,8 +672,8 @@ export class InventoryHud extends Component {
     badgeLabelNode.layer = Layers.Enum.UI_2D;
     badgeNode.addChild(badgeLabelNode);
     const badgeLabel = badgeLabelNode.addComponent(Label);
-    badgeLabel.fontSize = 14;
-    badgeLabel.lineHeight = 18;
+    badgeLabel.fontSize = resolveUiFontSize(14);
+    badgeLabel.lineHeight = resolveUiLineHeight(18);
     badgeLabel.color = new Color(20, 14, 6, 255);
     badgeLabel.string = '장착중';
     badgeLabel.horizontalAlign = Label.HorizontalAlign.CENTER;

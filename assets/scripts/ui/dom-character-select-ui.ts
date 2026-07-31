@@ -9,6 +9,7 @@ import {
   type CharacterId,
   getCharacterDefinition,
 } from '../player/character-registry';
+import { mobileFontUnifyCss } from './mobile-shell';
 
 const ROOT_ID = 'exgame-character-select';
 const STYLE_ID = 'exgame-character-select-style';
@@ -222,6 +223,7 @@ export class DomCharacterSelectUi {
 }
 #${ROOT_ID} .exgame-char-cancel { background: #243044; color: #d7e4f5; }
 #${ROOT_ID} .exgame-char-ok { background: #d9893d; border-color: #f0b46a; color: #1a1008; }
+${mobileFontUnifyCss(`#${ROOT_ID}`)}
 `;
   }
 }

@@ -5,7 +5,7 @@ import {
   hasAndroidNativeBridge,
   requestAndroidApkUpdate,
 } from '../platform/android-native-bridge';
-import { isMobileShell } from '../ui/mobile-shell';
+import { isMobileShell, mobileFontUnifyCss } from '../ui/mobile-shell';
 
 const STACK_ID = 'exgame-settings-stack';
 const SETTINGS_BTN_ID = 'exgame-settings-gear';
@@ -405,7 +405,6 @@ body.exgame-mobile .exgame-dom-gear {
   height: 28px;
   border-width: 2px;
   border-radius: 8px;
-  font-size: 9px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.35);
   padding: 0 4px;
   white-space: nowrap;
@@ -519,6 +518,10 @@ body.exgame-mobile .exgame-dom-audio-btn {
   border-bottom: 1px solid #243248;
 }
 .exgame-tip { margin: 12px 0 0; font-size: 12px; color: #9aa8bc; }
+${mobileFontUnifyCss(`#${STACK_ID}`)}
+${mobileFontUnifyCss(`#${OVERLAY_ID}`)}
+${mobileFontUnifyCss('#exgame-bgm-add-bar')}
+${mobileFontUnifyCss('#exgame-bgm-url-modal')}
 `;
   }
 }

@@ -11,6 +11,10 @@ import {
 
 import { formatNumber2 } from '../core/game-balance-settings';
 import {
+  resolveUiFontSize,
+  resolveUiLineHeight,
+} from '../ui/hud-layout';
+import {
   PLAYER_COLLISION_HALF,
   type PlayerSprite,
 } from './player-sprite';
@@ -57,8 +61,8 @@ export class PlayerLowHealthFeedback extends Component {
     this.node.addChild(labelNode);
     labelNode.addComponent(UITransform).setContentSize(80, 20);
     const label = labelNode.addComponent(Label);
-    label.fontSize = 14;
-    label.lineHeight = 16;
+    label.fontSize = resolveUiFontSize(14);
+    label.lineHeight = resolveUiLineHeight(16);
     label.color = new Color(255, 240, 240, 255);
     label.string = '';
     label.overflow = Label.Overflow.NONE;

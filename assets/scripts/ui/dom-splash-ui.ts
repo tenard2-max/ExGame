@@ -3,6 +3,8 @@
  * 최소 표시 시간 동안은 입력을 막고, 이후 클릭(또는 Enter/Space)으로만 닫습니다.
  */
 
+import { mobileFontUnifyCss } from './mobile-shell';
+
 const ROOT_ID = 'exgame-splash-root';
 const STYLE_ID = 'exgame-splash-style';
 const HINT_ID = 'exgame-splash-hint';
@@ -187,6 +189,7 @@ export class DomSplashUi {
         0%, 100% { opacity: 0.72; }
         50% { opacity: 1; }
       }
+${mobileFontUnifyCss(`#${ROOT_ID}`)}
     `;
     document.head.appendChild(style);
   }

@@ -9,6 +9,7 @@ import {
 } from 'cc';
 
 import type { PlayerStatsModel } from '../player/player-stats-model';
+import { resolveUiFontSize, resolveUiLineHeight } from './hud-layout';
 import { isMobileShell } from './mobile-shell';
 
 const { ccclass } = _decorator;
@@ -112,17 +113,19 @@ export class StatusHud extends Component {
     fontSize: number,
     lineHeight: number,
   ): Label {
+    const resolvedFontSize = resolveUiFontSize(fontSize);
+    const resolvedLineHeight = resolveUiLineHeight(lineHeight);
     const labelNode = new Node(name);
     labelNode.layer = Layers.Enum.UI_2D;
     this.node.addChild(labelNode);
     labelNode.setPosition(0, offsetY);
     const transform = labelNode.addComponent(UITransform);
     transform.setAnchorPoint(0, 1);
-    transform.setContentSize(STATS_LABEL_WIDTH, lineHeight + 8);
+    transform.setContentSize(STATS_LABEL_WIDTH, resolvedLineHeight + 8);
 
     const label = labelNode.addComponent(Label);
-    label.fontSize = fontSize;
-    label.lineHeight = lineHeight;
+    label.fontSize = resolvedFontSize;
+    label.lineHeight = resolvedLineHeight;
     label.color = color;
     label.string = '';
     label.overflow = Label.Overflow.NONE;

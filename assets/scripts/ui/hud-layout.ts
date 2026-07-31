@@ -1,9 +1,27 @@
 import { Camera, Node, Vec3, view } from 'cc';
 
+import {
+  isMobileShell,
+  MOBILE_UI_FONT_SIZE,
+  MOBILE_UI_LINE_HEIGHT,
+} from './mobile-shell';
+
 /** 디자인 해상도(2560×1440) UI 좌표계 기준 HUD 배치 상수입니다. */
 
 export const DESIGN_WIDTH = 2560;
 export const DESIGN_HEIGHT = 1440;
+
+/**
+ * 모바일에서는 HUD 글자 계층을 없애고 한 크기로 통일합니다.
+ * PC는 기존 크기를 그대로 씁니다.
+ */
+export function resolveUiFontSize(desktopFontSize: number): number {
+  return isMobileShell() ? MOBILE_UI_FONT_SIZE : desktopFontSize;
+}
+
+export function resolveUiLineHeight(desktopLineHeight: number): number {
+  return isMobileShell() ? MOBILE_UI_LINE_HEIGHT : desktopLineHeight;
+}
 
 const uiToScreenPos = new Vec3();
 const uiToWorldPos = new Vec3();

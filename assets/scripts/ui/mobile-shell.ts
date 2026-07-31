@@ -5,6 +5,38 @@
 
 const MOBILE_BODY_CLASS = 'exgame-mobile';
 
+/**
+ * 모바일 DOM 오버레이 통일 폰트(px).
+ * 기존 모바일 정적 최솟값 9px에서 1 줄인 값으로 전 오버레이를 맞춥니다.
+ */
+export const MOBILE_DOM_FONT_PX = 8;
+
+/** 모바일 Cocos HUD 통일 폰트(디자인 좌표). 기존 최솟값 13에서 1 줄인 값. */
+export const MOBILE_UI_FONT_SIZE = 12;
+
+/** Label 짝 lineHeight. 기존 HUD 관례(fontSize + 4)를 따릅니다. */
+export const MOBILE_UI_LINE_HEIGHT = MOBILE_UI_FONT_SIZE + 4;
+
+/**
+ * 모바일에서 해당 오버레이 안의 모든 글자를 한 크기로 맞추는 CSS를 만듭니다.
+ * 각 오버레이의 자체 스타일시트 끝에 붙여 셀렉터 우선순위를 확보합니다.
+ *
+ * `rootSelector`는 `#exgame-...` 같은 id 셀렉터여야 오버레이 내부의
+ * `#root .cls` (1,1,0) 규칙보다 우선순위가 높아집니다.
+ */
+export function mobileFontUnifyCss(rootSelector: string): string {
+  return `
+body.exgame-mobile ${rootSelector},
+body.exgame-mobile ${rootSelector} * {
+  font-size: ${MOBILE_DOM_FONT_PX}px !important;
+}
+/* 파일 input 숨김 트릭(font-size:0)은 유지해야 합니다. */
+body.exgame-mobile ${rootSelector} input[type="file"] {
+  font-size: 0 !important;
+}
+`;
+}
+
 /** 터치 우선 환경이거나 강제 플래그일 때 모바일 셸로 취급합니다. */
 export function isMobileShell(): boolean {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') {

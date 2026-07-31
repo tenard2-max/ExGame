@@ -3,6 +3,8 @@
  * 빈 영역은 투명·클릭 통과라 배경 타일이 그대로 보입니다.
  */
 
+import { MOBILE_DOM_FONT_PX } from './mobile-shell';
+
 export type NpcPortraitId = 'blacksmith' | 'merchant' | 'teleporter' | 'banker';
 
 const PORTRAIT_FILES: Record<NpcPortraitId, string> = {
@@ -20,9 +22,6 @@ const SHELL_STYLE_ID = 'exgame-npc-dialogue-shell-style';
 /** 데스크톱에서만 살짝 중앙으로 당깁니다(모바일은 잘림 방지로 0). */
 const PORTRAIT_SHIFT_DESKTOP_PX = 48;
 const PANEL_SHIFT_DESKTOP_PX = 32;
-
-/** 모바일 NPC 패널 타이포 배율(데스크톱 대비). */
-export const NPC_MOBILE_FONT_SCALE = 0.4;
 
 /**
  * 빌드 산출물 `ui/portraits/*.png`.
@@ -187,17 +186,16 @@ export function bindNpcTouchScrollInRoot(
   }
 }
 
-const fs = (px: number): string => `${+(px * NPC_MOBILE_FONT_SCALE).toFixed(2)}px`;
-
 /** 타이틀(h2)이 패널 내 최대 글자 크기. 그 외는 반드시 더 작음. */
 const NPC_TITLE_FS = '22px';
 const NPC_SUB_FS = '14px';
 const NPC_BODY_FS = '13px';
 const NPC_META_FS = '12px';
-const NPC_TITLE_FS_MOBILE = fs(26);
-const NPC_SUB_FS_MOBILE = fs(14);
-const NPC_BODY_FS_MOBILE = fs(12);
-const NPC_META_FS_MOBILE = fs(11);
+/** 모바일은 계층 없이 한 크기로 통일합니다. */
+const NPC_TITLE_FS_MOBILE = `${MOBILE_DOM_FONT_PX}px`;
+const NPC_SUB_FS_MOBILE = `${MOBILE_DOM_FONT_PX}px`;
+const NPC_BODY_FS_MOBILE = `${MOBILE_DOM_FONT_PX}px`;
+const NPC_META_FS_MOBILE = `${MOBILE_DOM_FONT_PX}px`;
 
 /** 각 NPC UI `ensureStyle`에 공통으로 합칩니다. */
 export const NPC_DIALOGUE_SHELL_CSS = `
@@ -449,6 +447,14 @@ export const NPC_DIALOGUE_SHELL_CSS = `
   body.exgame-mobile .exgame-bk-list,
   body.exgame-mobile .exgame-tp-list {
     max-height: none !important;
+  }
+
+  /* 모바일: 변수를 쓰지 않는 요소까지 포함해 한 크기로 확정합니다. */
+  body.exgame-mobile .exgame-mc-panel *,
+  body.exgame-mobile .exgame-bs-panel *,
+  body.exgame-mobile .exgame-bk-panel *,
+  body.exgame-mobile .exgame-tp-panel * {
+    font-size: ${MOBILE_DOM_FONT_PX}px !important;
   }
 `;
 

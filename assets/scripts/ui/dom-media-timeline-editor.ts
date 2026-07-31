@@ -23,6 +23,7 @@ import {
   type TimelineClip,
 } from '../media/media-timeline-types';
 import { setMediaEditorOpen } from './hud-layout';
+import { mobileFontUnifyCss } from './mobile-shell';
 
 const ROOT_ID = 'exgame-media-editor';
 const STYLE_ID = 'exgame-media-editor-style';
@@ -1346,6 +1347,7 @@ export class DomMediaTimelineEditor {
 #${ROOT_ID} .exme-fname {
   font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+${mobileFontUnifyCss(`#${ROOT_ID}`)}
 `;
   }
 }

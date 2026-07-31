@@ -11,7 +11,11 @@ import {
   Vec3,
 } from 'cc';
 
-import { uiLocationToCanvasLocal } from './hud-layout';
+import {
+  resolveUiFontSize,
+  resolveUiLineHeight,
+  uiLocationToCanvasLocal,
+} from './hud-layout';
 
 const { ccclass } = _decorator;
 
@@ -47,8 +51,8 @@ export class TooltipHud extends Component {
     this.node.addChild(labelNode);
     labelNode.addComponent(UITransform).setAnchorPoint(0, 0.5);
     this.label = labelNode.addComponent(Label);
-    this.label.fontSize = TOOLTIP_FONT_SIZE;
-    this.label.lineHeight = TOOLTIP_FONT_SIZE + 6;
+    this.label.fontSize = resolveUiFontSize(TOOLTIP_FONT_SIZE);
+    this.label.lineHeight = resolveUiLineHeight(TOOLTIP_FONT_SIZE + 6);
     this.label.color = new Color(240, 248, 255, 255);
     this.label.overflow = Label.Overflow.NONE;
     this.label.horizontalAlign = Label.HorizontalAlign.LEFT;

@@ -169,6 +169,24 @@ if ($indexFinal -notmatch 'exgame-mp4-fab') {
 
 & $syncScript -OutputPath $outputPath
 
+# 모바일에는 ffmpeg.exe/로컬 서버가 없으므로 브라우저 인코더를 함께 번들합니다.
+# tools/ 는 git 제외 대상이라 없으면 여기서 내려받습니다.
+$ffmpegWasmSrc = Join-Path $projectPath "tools\ffmpeg-wasm"
+$ffmpegWasmFiles = @("ffmpeg.js", "814.ffmpeg.js", "ffmpeg-core.js", "ffmpeg-core.wasm")
+$needFetch = $false
+foreach ($name in $ffmpegWasmFiles) {
+    if (-not (Test-Path -LiteralPath (Join-Path $ffmpegWasmSrc $name))) { $needFetch = $true }
+}
+if ($needFetch) {
+    & (Join-Path $PSScriptRoot "fetch-ffmpeg-wasm.ps1")
+}
+$ffmpegWasmDst = Join-Path $outputPath "ffmpeg-wasm"
+New-Item -ItemType Directory -Force -Path $ffmpegWasmDst | Out-Null
+foreach ($name in $ffmpegWasmFiles) {
+    Copy-Item -LiteralPath (Join-Path $ffmpegWasmSrc $name) -Destination (Join-Path $ffmpegWasmDst $name) -Force
+}
+Write-Host "Bundled ffmpeg.wasm runtime into build output"
+
 # Build output sometimes keeps stale 1280x720; force QHD to match runtime DESIGN_*.
 $settingsPath = Join-Path $outputPath "src\settings.json"
 if (Test-Path -LiteralPath $settingsPath) {

@@ -138,7 +138,8 @@ public class MainActivity extends AppCompatActivity {
             ) {
                 WebViewAssetLoader loader = assetLoaderRef.get();
                 if (loader == null) return null;
-                return loader.shouldInterceptRequest(request.getUrl());
+                Uri url = request.getUrl();
+                return withWasmMimeType(url, loader.shouldInterceptRequest(url));
             }
 
             @Override
@@ -240,6 +241,28 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         super.onActivityResult(requestCode, resultCode, data);
+    }
+
+    /**
+     * Android는 .wasm 확장자의 MIME을 모릅니다. 그대로 두면 Media Editor의
+     * ffmpeg 코어가 WebAssembly 스트리밍 컴파일에 실패하므로 직접 지정합니다.
+     */
+    @Nullable
+    private static WebResourceResponse withWasmMimeType(
+            Uri url,
+            @Nullable WebResourceResponse response
+    ) {
+        if (response == null) {
+            return null;
+        }
+        String path = url.getPath();
+        if (path == null || !path.endsWith(".wasm")) {
+            return response;
+        }
+        if ("application/wasm".equals(response.getMimeType())) {
+            return response;
+        }
+        return new WebResourceResponse("application/wasm", null, response.getData());
     }
 
     private void installAssetLoader(boolean useOta) {

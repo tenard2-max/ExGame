@@ -3,13 +3,17 @@
  * Export(FFmpeg)는 별도 확인 후 연결합니다.
  */
 import {
+  androidSaveBridge,
   downloadBlob,
   exportTimelineMp4,
   fetchExportStatus,
+  saveBlobToAndroid,
   saveBlobWithPicker,
   type ExportFps,
   type ExportResolution,
+  type MediaExportOptions,
 } from '../media/media-ffmpeg-export';
+import { exportTimelineMp4Wasm } from '../media/media-wasm-export';
 import { findClipAtTime, listVisualClips } from '../media/media-timeline-layout';
 import {
   MediaTimelineProject,
@@ -23,7 +27,7 @@ import {
   type TimelineClip,
 } from '../media/media-timeline-types';
 import { setMediaEditorOpen } from './hud-layout';
-import { mobileFontUnifyCss } from './mobile-shell';
+import { isMobileShell, mobileFontUnifyCss } from './mobile-shell';
 
 const ROOT_ID = 'exgame-media-editor';
 const STYLE_ID = 'exgame-media-editor-style';
@@ -389,13 +393,18 @@ export class DomMediaTimelineEditor {
     speedInput?.addEventListener('input', () => syncSpeedUi(true));
     syncSpeedUi(false);
 
-    void fetchExportStatus().then((status) => {
-      if (!status.ready) {
-        this.setStatus(
-          'Export 준비: tools/ffmpeg/ffmpeg.exe 필요 (scripts/fetch-ffmpeg.ps1). auto-run 서버로 실행하세요.',
-        );
-      }
-    });
+    // 모바일에는 로컬 서버가 없고 폰 안에서 직접 인코딩하므로 서버 안내를 띄우지 않습니다.
+    if (isMobileShell()) {
+      this.setStatus('이 기기에서 직접 MP4를 만듭니다 (PC보다 느립니다).');
+    } else {
+      void fetchExportStatus().then((status) => {
+        if (!status.ready) {
+          this.setStatus(
+            'Export 준비: tools/ffmpeg/ffmpeg.exe 필요 (scripts/fetch-ffmpeg.ps1). auto-run 서버로 실행하세요.',
+          );
+        }
+      });
+    }
 
     const mp3Input = root.querySelector('[data-role="mp3-input"]') as HTMLInputElement | null;
     mp3Input?.addEventListener('change', () => {
@@ -577,6 +586,78 @@ export class DomMediaTimelineEditor {
     this.exportOverlay.hidden = !show;
   }
 
+  private exportOptions(): MediaExportOptions {
+    return {
+      resolution: this.exportResolution,
+      fps: this.exportFps,
+      videoSpeed: this.exportVideoSpeed,
+    };
+  }
+
+  private exportFilename(): string {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    return `exgame-export-${stamp}.mp4`;
+  }
+
+  /** PC 경로: 로컬 파이썬 서버의 ffmpeg.exe가 인코딩합니다. */
+  private async exportViaLocalServer(snap: MediaTimelineSnapshot): Promise<string> {
+    const status = await fetchExportStatus();
+    if (!status.ready) {
+      throw new Error(
+        'ffmpeg.exe 없음. game/scripts/fetch-ffmpeg.ps1 실행 후 auto-run.bat 으로 다시 실행하세요.',
+      );
+    }
+    this.setExportProgress(
+      `업로드/인코딩 준비 (${this.exportResolution} @ ${this.exportFps}, speed ${this.exportVideoSpeed.toFixed(2)}x)`,
+      4,
+    );
+    const { blob, savedPath } = await exportTimelineMp4(snap, this.exportOptions(), (message, progress) =>
+      this.setExportProgress(message, progress ?? 0),
+    );
+    if (savedPath) {
+      return `서버 저장:\n${savedPath}\n\n탐색기에서 이 파일을 여세요.`;
+    }
+
+    const filename = this.exportFilename();
+    if (blob) {
+      const picked = await saveBlobWithPicker(blob, filename);
+      if (picked) return `저장: ${picked}`;
+      downloadBlob(blob, filename);
+    }
+    return `브라우저 다운로드: ${filename} (다운로드 폴더 확인)`;
+  }
+
+  /**
+   * 모바일 경로: ffmpeg.exe도 로컬 서버도 없으므로 ffmpeg.wasm으로 폰 안에서 인코딩합니다.
+   * APK에서는 blob: 다운로드가 동작하지 않아 네이티브 브리지로 저장합니다.
+   */
+  private async exportInBrowser(snap: MediaTimelineSnapshot): Promise<string> {
+    const { blob } = await exportTimelineMp4Wasm(snap, this.exportOptions(), (message, progress) =>
+      this.setExportProgress(message, progress ?? 0),
+    );
+
+    const filename = this.exportFilename();
+    if (androidSaveBridge()) {
+      const saved = await saveBlobToAndroid(blob, filename, (message, progress) =>
+        this.setExportProgress(message, progress ?? 0),
+      );
+      if (saved) return `저장 완료:\n${saved}\n\n갤러리/파일 앱에서 확인하세요.`;
+    }
+    downloadBlob(blob, filename);
+    return `다운로드: ${filename}`;
+  }
+
+  /** 폰 인코딩은 오래 걸리므로 시작 전에 알려 줍니다. */
+  private confirmBrowserExport(snap: MediaTimelineSnapshot): boolean {
+    const estimateMin = Math.max(1, Math.ceil((snap.masterDurationSec / 60) * 5));
+    return window.confirm(
+      'PC 서버 없이 이 기기에서 직접 인코딩합니다.\n\n' +
+        `길이 ${Math.round(snap.masterDurationSec)}초 · ${this.exportResolution}\n` +
+        `예상 소요: 약 ${estimateMin}분 이상\n\n` +
+        '진행 중에는 화면을 끄거나 앱을 나가지 마세요. 계속할까요?',
+    );
+  }
+
   private async runExport(): Promise<void> {
     if (this.exporting) return;
     const snap = this.project.getSnapshot();
@@ -585,44 +666,21 @@ export class DomMediaTimelineEditor {
       window.alert('Export: 먼저 MP3를 로드하세요.');
       return;
     }
+
+    const useBrowserEncoder = isMobileShell();
+    if (useBrowserEncoder && !this.confirmBrowserExport(snap)) {
+      this.setStatus('Export를 취소했습니다.');
+      return;
+    }
+
     this.exporting = true;
     this.showExportOverlay(true);
     this.setExportProgress('Export 시작…', 1);
     try {
-      const status = await fetchExportStatus();
-      if (!status.ready) {
-        throw new Error(
-          'ffmpeg.exe 없음. game/scripts/fetch-ffmpeg.ps1 실행 후 auto-run.bat 으로 다시 실행하세요.',
-        );
-      }
-      this.setExportProgress(
-        `업로드/인코딩 준비 (${this.exportResolution} @ ${this.exportFps}, speed ${this.exportVideoSpeed.toFixed(2)}x)`,
-        4,
-      );
-      const { blob, savedPath } = await exportTimelineMp4(
-        snap,
-        {
-          resolution: this.exportResolution,
-          fps: this.exportFps,
-          videoSpeed: this.exportVideoSpeed,
-        },
-        (message, progress) => this.setExportProgress(message, progress ?? 0),
-      );
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      const filename = `exgame-export-${stamp}.mp4`;
-      let picked: string | null = null;
-      if (blob) {
-        picked = await saveBlobWithPicker(blob, filename);
-        if (!picked) {
-          downloadBlob(blob, filename);
-        }
-      }
-      const where = savedPath
-        ? `서버 저장:\n${savedPath}\n\n탐색기에서 이 파일을 여세요.`
-        : picked
-          ? `저장: ${picked}`
-          : `브라우저 다운로드: ${filename} (다운로드 폴더 확인)`;
-      this.setExportProgress(`Export 완료 · ${savedPath || picked || filename}`, 100);
+      const where = useBrowserEncoder
+        ? await this.exportInBrowser(snap)
+        : await this.exportViaLocalServer(snap);
+      this.setExportProgress('Export 완료', 100);
       window.alert(`Export 완료\n\n${where}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Export 실패';

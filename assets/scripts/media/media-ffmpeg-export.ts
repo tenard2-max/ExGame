@@ -257,6 +257,76 @@ export async function exportTimelineMp4(
   return { blob: null, savedPath: result.path };
 }
 
+interface ExGameNativeBridge {
+  saveVideoBegin(filename: string): string;
+  saveVideoChunk(token: string, base64: string): boolean;
+  saveVideoEnd(token: string): string;
+  saveVideoAbort(token: string): void;
+}
+
+/** APK 안에서 실행 중이고 저장 브리지를 쓸 수 있으면 반환합니다. */
+export function androidSaveBridge(): ExGameNativeBridge | null {
+  const scope = window as Window & { ExGameNative?: Partial<ExGameNativeBridge> };
+  const bridge = scope.ExGameNative;
+  if (!bridge || typeof bridge.saveVideoBegin !== 'function') return null;
+  return bridge as ExGameNativeBridge;
+}
+
+/** 큰 배열을 한 번에 넘기면 스택이 넘치므로 나눠서 문자열로 만듭니다. */
+function toBase64(bytes: Uint8Array): string {
+  const STEP = 0x8000;
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += STEP) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + STEP));
+  }
+  return btoa(binary);
+}
+
+/**
+ * 폰에서 만든 MP4를 네이티브로 넘겨 Movies/ExGame 에 저장합니다.
+ * WebView에는 blob: 다운로드 처리기가 없어 &lt;a download&gt;가 통하지 않습니다.
+ * 수십 MB를 한 문자열로 넘기면 OOM이 나므로 청크로 나눠 보냅니다.
+ */
+export async function saveBlobToAndroid(
+  blob: Blob,
+  filename: string,
+  onProgress?: (message: string, progress?: number) => void,
+): Promise<string | null> {
+  const bridge = androidSaveBridge();
+  if (!bridge) return null;
+
+  const CHUNK_BYTES = 1024 * 1024;
+  const token = bridge.saveVideoBegin(filename);
+  if (!token) {
+    throw new Error('저장을 시작하지 못했습니다. 저장 공간을 확인해 주세요.');
+  }
+
+  try {
+    for (let offset = 0; offset < blob.size; offset += CHUNK_BYTES) {
+      const slice = blob.slice(offset, Math.min(offset + CHUNK_BYTES, blob.size));
+      const bytes = new Uint8Array(await slice.arrayBuffer());
+      if (!bridge.saveVideoChunk(token, toBase64(bytes))) {
+        throw new Error('저장 중 오류가 발생했습니다.');
+      }
+      const done = Math.min(offset + CHUNK_BYTES, blob.size);
+      onProgress?.(
+        `저장 중 ${Math.round((done / blob.size) * 100)}%…`,
+        Math.round((done / blob.size) * 100),
+      );
+      // 브리지 호출 사이에 UI가 그려질 틈을 줍니다.
+      await sleep(0);
+    }
+    const saved = bridge.saveVideoEnd(token);
+    if (!saved) {
+      throw new Error('저장에 실패했습니다. 저장 공간을 확인해 주세요.');
+    }
+    return saved;
+  } catch (error) {
+    bridge.saveVideoAbort(token);
+    throw error;
+  }
+}
+
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');

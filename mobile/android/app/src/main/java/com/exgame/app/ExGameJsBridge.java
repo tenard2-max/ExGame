@@ -12,7 +12,7 @@ import java.util.concurrent.ExecutorService;
 
 /**
  * WebView ↔ 네이티브 브리지.
- * 게임 DOM에서 APK 업데이트 확인/다운로드 페이지 열기에 사용합니다.
+ * APK 업데이트 확인/다운로드 페이지 열기, Media Editor의 MP4 저장에 사용합니다.
  */
 public final class ExGameJsBridge {
     private static final String TAG = "ExGameJsBridge";
@@ -20,6 +20,7 @@ public final class ExGameJsBridge {
     private final MainActivity activity;
     private final GameUpdateManager updater;
     private final ExecutorService worker;
+    private final MediaExportSaver exportSaver;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     public ExGameJsBridge(
@@ -30,6 +31,7 @@ public final class ExGameJsBridge {
         this.activity = activity;
         this.updater = updater;
         this.worker = worker;
+        this.exportSaver = new MediaExportSaver(activity);
     }
 
     @JavascriptInterface
@@ -75,6 +77,38 @@ public final class ExGameJsBridge {
     @JavascriptInterface
     public void openReleasesPage() {
         mainHandler.post(() -> openUrl(updater.getReleasesLatestUrl()));
+    }
+
+    /**
+     * Media Editor MP4 저장 (base64 청크 이어받기).
+     * WebView에 blob: 다운로드 처리기가 없어 네이티브로 직접 씁니다.
+     * 반환값은 토큰이며, 빈 문자열이면 시작 실패입니다.
+     */
+    @JavascriptInterface
+    public String saveVideoBegin(String filename) {
+        return exportSaver.begin(filename);
+    }
+
+    @JavascriptInterface
+    public boolean saveVideoChunk(String token, String base64) {
+        return exportSaver.chunk(token, base64);
+    }
+
+    /** 저장을 마치고 사용자에게 보여줄 경로를 돌려줍니다. 빈 문자열이면 실패입니다. */
+    @JavascriptInterface
+    public String saveVideoEnd(String token) {
+        String saved = exportSaver.end(token);
+        if (!saved.isEmpty()) {
+            mainHandler.post(() ->
+                    Toast.makeText(activity, "저장 완료: " + saved, Toast.LENGTH_LONG).show()
+            );
+        }
+        return saved;
+    }
+
+    @JavascriptInterface
+    public void saveVideoAbort(String token) {
+        exportSaver.abort(token);
     }
 
     private void handleApkCheckResult(GameUpdateManager.ApkCheckResult result) {

@@ -27,6 +27,8 @@ import { mobileFontUnifyCss } from './mobile-shell';
 
 const ROOT_ID = 'exgame-media-editor';
 const STYLE_ID = 'exgame-media-editor-style';
+/** 에디터가 열린 동안 index.html이 주입한 MP4 진입 버튼을 숨기기 위한 플래그. */
+const BODY_OPEN_CLASS = 'exgame-media-editor-open';
 const ASSET_MIME = 'application/x-exme-asset';
 
 type ResizeSession = {
@@ -118,6 +120,7 @@ export class DomMediaTimelineEditor {
     this.ensureStyle();
     this.closeDomOnly();
     setMediaEditorOpen(true);
+    document.body.classList.add(BODY_OPEN_CLASS);
 
     this.previewVideo.muted = true;
     this.previewVideo.playsInline = true;
@@ -271,6 +274,7 @@ export class DomMediaTimelineEditor {
     this.previewImage.removeAttribute('src');
     this.closeDomOnly();
     setMediaEditorOpen(false);
+    document.body.classList.remove(BODY_OPEN_CLASS);
   }
 
   isOpen(): boolean {
@@ -312,6 +316,13 @@ export class DomMediaTimelineEditor {
     this.previewImage.className = 'exme-preview-image';
     stack.append(this.previewVideo, this.previewImage);
     this.previewStage.appendChild(stack);
+    this.applyPreviewAspect();
+  }
+
+  /** 프리뷰 화면비를 선택한 Export 해상도(가로/세로)에 맞춥니다. */
+  private applyPreviewAspect(): void {
+    const [width, height] = this.exportResolution.split('x');
+    this.root?.style.setProperty('--exme-preview-aspect', `${width} / ${height}`);
   }
 
   private bindEvents(root: HTMLElement): void {
@@ -360,6 +371,7 @@ export class DomMediaTimelineEditor {
     const speedValue = root.querySelector('[data-role="export-speed-value"]');
     resSelect?.addEventListener('change', () => {
       this.exportResolution = resSelect.value as ExportResolution;
+      this.applyPreviewAspect();
     });
     fpsSelect?.addEventListener('change', () => {
       this.exportFps = Number(fpsSelect.value) as ExportFps;
@@ -1127,6 +1139,11 @@ export class DomMediaTimelineEditor {
       document.head.appendChild(style);
     }
     style.textContent = `
+/*
+ * index.html이 주입하는 MP4 진입 버튼은 z-index가 에디터보다 높습니다.
+ * 에디터가 열려 있는 동안에는 겹치지 않도록 숨깁니다.
+ */
+body.${BODY_OPEN_CLASS} #exgame-mp4-fab { display: none !important; }
 #${ROOT_ID} {
   position: fixed; inset: 0; z-index: 2147483000;
   background: #0b0e14; color: #e8eef7;
@@ -1316,7 +1333,9 @@ export class DomMediaTimelineEditor {
   background-color: #0e131b;
 }
 #${ROOT_ID} .exme-preview-stack {
-  position: relative; width: min(100%, 720px); aspect-ratio: 16 / 9;
+  position: relative; width: min(100%, 720px);
+  aspect-ratio: var(--exme-preview-aspect, 16 / 9);
+  max-height: 100%;
   background: #000; overflow: hidden; border: 1px solid #30384a;
 }
 #${ROOT_ID} .exme-preview-video,
@@ -1346,6 +1365,67 @@ export class DomMediaTimelineEditor {
 }
 #${ROOT_ID} .exme-fname {
   font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/*
+ * 모바일: 3열 와이드 레이아웃을 세로 1열로 쌓고, 셸 전체를 한 번에 스크롤합니다.
+ * 각 패널의 내부 스크롤은 꺼서 스크롤 주체를 셸 하나로 통일합니다.
+ */
+/* 모바일 브라우저 툴바가 접혔다 펴져도 셸이 화면 밖으로 나가지 않게 합니다. */
+body.exgame-mobile #${ROOT_ID} {
+  height: 100dvh;
+}
+body.exgame-mobile #${ROOT_ID} .exme-shell {
+  display: block;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+body.exgame-mobile #${ROOT_ID} .exme-topbar {
+  position: sticky; top: 0; z-index: 20;
+  flex-wrap: wrap; gap: 8px; padding: 8px 10px;
+}
+body.exgame-mobile #${ROOT_ID} .exme-timeline-sector {
+  padding: 8px 10px 10px;
+}
+body.exgame-mobile #${ROOT_ID} .exme-timeline-header { gap: 8px; }
+body.exgame-mobile #${ROOT_ID} .exme-master-name { margin-left: 0; }
+/*
+ * 레인 3개(18px 눈금 + 3×36px)가 들어가는 최소 높이입니다.
+ * 트랙 태그 폭(36px)과 좌우 마진(10px)은 플레이헤드 계산식과 맞물려 있어 건드리지 않습니다.
+ */
+body.exgame-mobile #${ROOT_ID} .exme-ruler-wrap,
+body.exgame-mobile #${ROOT_ID} .exme-ruler {
+  min-height: 136px; height: 136px;
+}
+body.exgame-mobile #${ROOT_ID} .exme-track-lane { height: 30px; }
+/* 타임라인 스크럽·클립 드래그가 페이지 스크롤에 뺏기지 않도록 합니다. */
+body.exgame-mobile #${ROOT_ID} .exme-ruler,
+body.exgame-mobile #${ROOT_ID} .exme-clip {
+  touch-action: none;
+}
+body.exgame-mobile #${ROOT_ID} .exme-work-sector {
+  display: block;
+}
+body.exgame-mobile #${ROOT_ID} .exme-actions,
+body.exgame-mobile #${ROOT_ID} .exme-preview-panel,
+body.exgame-mobile #${ROOT_ID} .exme-files {
+  border-right: none;
+  border-top: 1px solid #2a3344;
+  overflow: visible;
+}
+body.exgame-mobile #${ROOT_ID} .exme-actions { padding: 10px; gap: 8px; }
+body.exgame-mobile #${ROOT_ID} .exme-actions button { height: 34px; }
+body.exgame-mobile #${ROOT_ID} .exme-file-list {
+  overflow: visible; max-height: none; padding: 6px;
+}
+/* 프리뷰: 높이를 고정하고 폭은 종횡비가 정하도록 둡니다(세로 모드 대응). */
+body.exgame-mobile #${ROOT_ID} .exme-preview-stage {
+  padding: 8px; height: 40vh; flex: 0 0 auto;
+}
+body.exgame-mobile #${ROOT_ID} .exme-preview-stack {
+  width: auto; height: 100%; max-width: 100%;
 }
 ${mobileFontUnifyCss(`#${ROOT_ID}`)}
 `;
